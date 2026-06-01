@@ -1008,33 +1008,31 @@ async function startBookCreation() {
 async function createBookBlueprint() {
   const n = state.totalChapters;
 
-  const prompt = `אתה מחבר פנטזיה אפית ברמת ברנדון סנדרסון. צור תוכנית מפורטת לספר פנטזיה מקורי בעברית.
+  // Build prompt - keep summaries SHORT to avoid token limit
+  const prompt = `צור תוכנית לספר פנטזיה אפי בעברית בסגנון ברנדון סנדרסון עם ${n} פרקים.
 
-הספר חייב לכלול:
-- מערכת קסם מקורית עם כללים ברורים ("Hard Magic System" בסגנון סנדרסון)
-- עולם מרתק עם תרבויות ייחודיות
-- 3-4 דמויות ראשיות עם קשתות אופי מורכבות
-- עלילה עם שיאים, טוויסטים, ועומק רגשי
-- בדיוק ${n} פרקים
-
-החזר JSON בלבד, ללא הסברים, ללא קוד markdown, ללא שום טקסט מחוץ ל-JSON:
+החזר JSON בלבד, ללא markdown, ללא הסברים:
 {
   "title": "שם הספר",
-  "tagline": "משפט תיאור אחד מרתק",
+  "tagline": "משפט תיאור קצר",
   "genre": "פנטזיה אפית",
-  "world": "תיאור קצר של העולם (3-4 משפטים)",
-  "magicSystem": "תיאור מערכת הקסם והכללים שלה (2-3 משפטים)",
+  "world": "תיאור עולם קצר (2 משפטים בלבד)",
+  "magicSystem": "תיאור מערכת קסם קצר (משפט אחד)",
   "mainCharacters": [
-    {"name": "שם", "role": "תפקיד", "trait": "תכונה מרכזית"}
+    {"name": "שם", "role": "תפקיד", "trait": "תכונה"}
   ],
   "chapterOutlines": [
-    {"number": 1, "title": "שם הפרק", "summary": "מה קורה בפרק זה (2-3 משפטים)", "pov": "שם הדמות שמנקודת מבטה"}
+    {"number": 1, "title": "שם", "summary": "משפט אחד בלבד", "pov": "שם דמות"}
   ]
 }
 
-חשוב: chapterOutlines חייב להכיל בדיוק ${n} פרקים. כל פרק עם number, title, summary, pov.`;
+כללים קריטיים:
+- chapterOutlines חייב להכיל בדיוק ${n} פרקים
+- summary של כל פרק: משפט אחד קצר בלבד
+- mainCharacters: 3 דמויות בלבד
+- JSON בלבד, ללא שום טקסט נוסף`;
 
-  const raw = await callGemini(prompt, '', 4000);
+  const raw = await callGemini(prompt, '', 6000);
 
   // Strip markdown fences and extract JSON
   console.log('RAW RESPONSE:', raw.substring(0, 500));
