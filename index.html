@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -18,9 +17,9 @@
     --shadow: rgba(26,20,16,0.4);
     --glow: rgba(201,168,76,0.15);
   }
- 
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
- 
+
   body {
     background: var(--ink);
     color: var(--parchment);
@@ -29,7 +28,7 @@
     overflow-x: hidden;
     position: relative;
   }
- 
+
   /* Atmospheric background */
   body::before {
     content: '';
@@ -48,7 +47,7 @@
     pointer-events: none;
     z-index: 0;
   }
- 
+
   /* ===== SCREENS ===== */
   .screen {
     display: none;
@@ -57,7 +56,7 @@
     min-height: 100vh;
   }
   .screen.active { display: flex; }
- 
+
   /* ===== WELCOME SCREEN ===== */
   #welcome-screen {
     flex-direction: column;
@@ -67,11 +66,11 @@
     text-align: center;
     gap: 3rem;
   }
- 
+
   .logo-area {
     animation: fadeInDown 1s ease both;
   }
- 
+
   .logo-symbol {
     font-size: 4rem;
     line-height: 1;
@@ -79,12 +78,12 @@
     filter: drop-shadow(0 0 30px var(--gold));
     animation: pulse-glow 3s ease-in-out infinite;
   }
- 
+
   @keyframes pulse-glow {
     0%, 100% { filter: drop-shadow(0 0 20px rgba(201,168,76,0.5)); }
     50% { filter: drop-shadow(0 0 40px rgba(201,168,76,0.8)); }
   }
- 
+
   .logo-title {
     font-family: 'Frank Ruhl Libre', serif;
     font-weight: 900;
@@ -94,7 +93,7 @@
     text-shadow: 0 0 60px rgba(201,168,76,0.3);
     line-height: 1.1;
   }
- 
+
   .logo-subtitle {
     font-size: 0.95rem;
     color: var(--gold-dim);
@@ -102,7 +101,7 @@
     margin-top: 0.5rem;
     font-weight: 300;
   }
- 
+
   .welcome-card {
     background: rgba(245,239,227,0.04);
     border: 1px solid rgba(201,168,76,0.2);
@@ -113,7 +112,7 @@
     animation: fadeInUp 1s ease 0.3s both;
     backdrop-filter: blur(10px);
   }
- 
+
   .welcome-card h2 {
     font-family: 'Frank Ruhl Libre', serif;
     font-weight: 700;
@@ -121,21 +120,21 @@
     color: var(--gold);
     margin-bottom: 0.5rem;
   }
- 
+
   .welcome-card p {
     font-size: 0.9rem;
     color: rgba(245,239,227,0.6);
     margin-bottom: 2rem;
     line-height: 1.7;
   }
- 
+
   .length-options {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 0.75rem;
     margin-bottom: 2rem;
   }
- 
+
   .length-btn {
     background: transparent;
     border: 1px solid rgba(201,168,76,0.3);
@@ -148,13 +147,13 @@
     text-align: center;
     border-radius: 1px;
   }
- 
+
   .length-btn:hover, .length-btn.selected {
     background: rgba(201,168,76,0.12);
     border-color: var(--gold);
     color: var(--gold);
   }
- 
+
   .length-btn .chapters-count {
     display: block;
     font-size: 1.6rem;
@@ -163,22 +162,22 @@
     color: var(--gold);
     margin-bottom: 0.25rem;
   }
- 
+
   .length-btn.selected .chapters-count { color: var(--gold); }
- 
+
   .key-input-area {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
     margin-bottom: 1.5rem;
   }
- 
+
   .key-input-area label {
     font-size: 0.8rem;
     color: var(--gold-dim);
     letter-spacing: 0.1em;
   }
- 
+
   .key-input-area input {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(201,168,76,0.25);
@@ -192,15 +191,15 @@
     direction: ltr;
     text-align: left;
   }
- 
+
   .key-input-area input:focus {
     border-color: var(--gold);
   }
- 
+
   .key-input-area input::placeholder {
     color: rgba(245,239,227,0.25);
   }
- 
+
   .create-btn {
     width: 100%;
     background: linear-gradient(135deg, var(--gold-dim), var(--gold));
@@ -217,7 +216,7 @@
     position: relative;
     overflow: hidden;
   }
- 
+
   .create-btn::after {
     content: '';
     position: absolute;
@@ -226,11 +225,11 @@
     transform: translateX(-100%);
     transition: transform 0.5s ease;
   }
- 
+
   .create-btn:hover::after { transform: translateX(100%); }
   .create-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(201,168,76,0.3); }
   .create-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
- 
+
   /* ===== LOADING SCREEN ===== */
   #loading-screen {
     flex-direction: column;
@@ -240,32 +239,32 @@
     text-align: center;
     padding: 2rem;
   }
- 
+
   .loading-rune {
     font-size: 5rem;
     animation: spin-slow 8s linear infinite;
     filter: drop-shadow(0 0 20px var(--gold));
   }
- 
+
   @keyframes spin-slow {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
- 
+
   .loading-title {
     font-family: 'Frank Ruhl Libre', serif;
     font-weight: 700;
     font-size: 1.5rem;
     color: var(--gold);
   }
- 
+
   .loading-status {
     font-size: 0.9rem;
     color: rgba(245,239,227,0.5);
     min-height: 1.5em;
     transition: opacity 0.3s;
   }
- 
+
   .loading-bar-wrap {
     width: 280px;
     height: 2px;
@@ -273,7 +272,7 @@
     border-radius: 1px;
     overflow: hidden;
   }
- 
+
   .loading-bar {
     height: 100%;
     background: linear-gradient(90deg, var(--gold-dim), var(--gold));
@@ -281,18 +280,18 @@
     animation: loading-pulse 2s ease-in-out infinite;
     width: 60%;
   }
- 
+
   @keyframes loading-pulse {
     0% { transform: translateX(-100%); }
     100% { transform: translateX(250%); }
   }
- 
+
   /* ===== LIBRARY SCREEN ===== */
   #library-screen {
     flex-direction: column;
     min-height: 100vh;
   }
- 
+
   .library-header {
     padding: 1.5rem 2rem;
     border-bottom: 1px solid rgba(201,168,76,0.15);
@@ -305,14 +304,14 @@
     top: 0;
     z-index: 10;
   }
- 
+
   .library-header .title {
     font-family: 'Frank Ruhl Libre', serif;
     font-weight: 900;
     font-size: 1.4rem;
     color: var(--gold);
   }
- 
+
   .book-title-display {
     font-size: 0.85rem;
     color: rgba(245,239,227,0.5);
@@ -322,7 +321,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
- 
+
   .new-book-btn {
     background: transparent;
     border: 1px solid rgba(201,168,76,0.3);
@@ -335,7 +334,7 @@
     transition: all 0.2s;
   }
   .new-book-btn:hover { border-color: var(--gold); color: var(--gold); background: rgba(201,168,76,0.08); }
- 
+
   .library-body {
     flex: 1;
     max-width: 680px;
@@ -343,7 +342,7 @@
     width: 100%;
     padding: 2rem 1.5rem;
   }
- 
+
   /* Book info panel */
   .book-info-panel {
     background: rgba(201,168,76,0.05);
@@ -352,7 +351,7 @@
     padding: 1.5rem;
     margin-bottom: 2rem;
   }
- 
+
   .book-info-panel h1 {
     font-family: 'Frank Ruhl Libre', serif;
     font-weight: 900;
@@ -361,7 +360,7 @@
     margin-bottom: 0.5rem;
     color: var(--parchment);
   }
- 
+
   .book-meta {
     display: flex;
     gap: 1.5rem;
@@ -370,19 +369,19 @@
     margin-bottom: 1rem;
     flex-wrap: wrap;
   }
- 
+
   .book-tagline {
     font-size: 0.95rem;
     color: rgba(245,239,227,0.65);
     font-style: italic;
     line-height: 1.6;
   }
- 
+
   /* Progress bar */
   .progress-section {
     margin-bottom: 2rem;
   }
- 
+
   .progress-label {
     display: flex;
     justify-content: space-between;
@@ -390,24 +389,24 @@
     color: var(--gold-dim);
     margin-bottom: 0.5rem;
   }
- 
+
   .progress-track {
     height: 3px;
     background: rgba(201,168,76,0.1);
     border-radius: 2px;
     overflow: hidden;
   }
- 
+
   .progress-fill {
     height: 100%;
     background: linear-gradient(90deg, var(--gold-dim), var(--gold));
     border-radius: 2px;
     transition: width 0.8s ease;
   }
- 
+
   /* Chapter list */
   .chapter-list { display: flex; flex-direction: column; gap: 0.5rem; }
- 
+
   .chapter-item {
     display: flex;
     align-items: center;
@@ -422,32 +421,32 @@
     text-align: right;
     font-family: 'Noto Serif Hebrew', serif;
   }
- 
+
   .chapter-item.written {
     border-color: rgba(201,168,76,0.12);
     background: rgba(245,239,227,0.02);
   }
- 
+
   .chapter-item.written:hover {
     background: rgba(201,168,76,0.07);
     border-color: rgba(201,168,76,0.25);
   }
- 
+
   .chapter-item.next-to-write {
     border-color: rgba(201,168,76,0.3);
     background: rgba(201,168,76,0.05);
   }
- 
+
   .chapter-item.next-to-write:hover {
     background: rgba(201,168,76,0.1);
     border-color: var(--gold);
   }
- 
+
   .chapter-item.locked {
     opacity: 0.3;
     cursor: default;
   }
- 
+
   .chapter-num {
     font-family: 'Frank Ruhl Libre', serif;
     font-weight: 700;
@@ -456,39 +455,39 @@
     min-width: 2rem;
     text-align: center;
   }
- 
+
   .chapter-info { flex: 1; }
- 
+
   .chapter-name {
     font-size: 0.95rem;
     color: var(--parchment);
     margin-bottom: 0.2rem;
   }
- 
+
   .chapter-item.locked .chapter-name { color: rgba(245,239,227,0.4); }
- 
+
   .chapter-hint {
     font-size: 0.75rem;
     color: rgba(245,239,227,0.35);
     font-style: italic;
   }
- 
+
   .chapter-status {
     font-size: 0.75rem;
     padding: 0.2rem 0.6rem;
     border-radius: 10px;
     font-family: monospace;
   }
- 
+
   .chapter-status.done { background: rgba(201,168,76,0.15); color: var(--gold); }
   .chapter-status.write { background: rgba(201,168,76,0.2); color: var(--gold); animation: blink 2s ease-in-out infinite; }
   .chapter-status.lock { background: rgba(255,255,255,0.05); color: rgba(245,239,227,0.2); }
- 
+
   @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
   }
- 
+
   /* Write next chapter button */
   .write-next-btn {
     width: 100%;
@@ -509,16 +508,16 @@
     justify-content: center;
     gap: 0.75rem;
   }
- 
+
   .write-next-btn:hover:not(:disabled) {
     background: linear-gradient(135deg, rgba(201,168,76,0.25), rgba(201,168,76,0.15));
     border-color: var(--gold);
     transform: translateY(-2px);
     box-shadow: 0 8px 30px rgba(201,168,76,0.15);
   }
- 
+
   .write-next-btn:disabled { opacity: 0.4; cursor: not-allowed; }
- 
+
   .writing-indicator {
     display: flex;
     align-items: center;
@@ -529,25 +528,25 @@
     justify-content: center;
     min-height: 1.5rem;
   }
- 
+
   .dot-anim span {
     animation: dot-bounce 1.4s ease-in-out infinite;
     display: inline-block;
   }
   .dot-anim span:nth-child(2) { animation-delay: 0.2s; }
   .dot-anim span:nth-child(3) { animation-delay: 0.4s; }
- 
+
   @keyframes dot-bounce {
     0%, 80%, 100% { transform: translateY(0); }
     40% { transform: translateY(-6px); }
   }
- 
+
   /* ===== READING SCREEN ===== */
   #reading-screen {
     flex-direction: column;
     min-height: 100vh;
   }
- 
+
   .reading-header {
     padding: 1rem 2rem;
     border-bottom: 1px solid rgba(201,168,76,0.1);
@@ -560,7 +559,7 @@
     top: 0;
     z-index: 10;
   }
- 
+
   .back-btn {
     background: transparent;
     border: 1px solid rgba(201,168,76,0.2);
@@ -573,13 +572,13 @@
     transition: all 0.2s;
   }
   .back-btn:hover { border-color: var(--gold); color: var(--gold); }
- 
+
   .reading-chapter-label {
     font-size: 0.8rem;
     color: var(--gold-dim);
     letter-spacing: 0.1em;
   }
- 
+
   .reading-body {
     flex: 1;
     max-width: 680px;
@@ -587,7 +586,7 @@
     width: 100%;
     padding: 3rem 2rem 6rem;
   }
- 
+
   .chapter-heading {
     text-align: center;
     margin-bottom: 3rem;
@@ -595,7 +594,7 @@
     border-bottom: 1px solid rgba(201,168,76,0.15);
     position: relative;
   }
- 
+
   .chapter-heading::after {
     content: '✦';
     position: absolute;
@@ -607,7 +606,7 @@
     color: var(--gold-dim);
     font-size: 0.7rem;
   }
- 
+
   .chapter-number-display {
     font-size: 0.75rem;
     letter-spacing: 0.3em;
@@ -615,7 +614,7 @@
     margin-bottom: 0.75rem;
     text-transform: uppercase;
   }
- 
+
   .chapter-title-display {
     font-family: 'Frank Ruhl Libre', serif;
     font-weight: 900;
@@ -623,7 +622,7 @@
     line-height: 1.2;
     color: var(--parchment);
   }
- 
+
   .chapter-epigraph {
     font-style: italic;
     font-size: 0.9rem;
@@ -631,21 +630,21 @@
     margin-top: 1rem;
     line-height: 1.7;
   }
- 
+
   .chapter-content {
     font-size: clamp(1rem, 2.5vw, 1.1rem);
     line-height: 1.95;
     color: rgba(245,239,227,0.88);
     text-align: justify;
   }
- 
+
   .chapter-content p {
     margin-bottom: 1.4em;
     text-indent: 1.5em;
   }
- 
+
   .chapter-content p:first-child { text-indent: 0; }
- 
+
   .chapter-content p:first-child::first-letter {
     font-family: 'Frank Ruhl Libre', serif;
     font-size: 3.5em;
@@ -657,7 +656,7 @@
     color: var(--gold);
     text-shadow: 0 0 30px rgba(201,168,76,0.4);
   }
- 
+
   .chapter-divider {
     text-align: center;
     color: var(--gold-dim);
@@ -666,7 +665,7 @@
     font-size: 0.7rem;
     opacity: 0.6;
   }
- 
+
   .chapter-end-actions {
     margin-top: 4rem;
     padding-top: 2rem;
@@ -676,7 +675,7 @@
     align-items: center;
     gap: 1rem;
   }
- 
+
   .next-chapter-btn {
     background: linear-gradient(135deg, var(--gold-dim), var(--gold));
     border: none;
@@ -690,14 +689,14 @@
     border-radius: 1px;
     transition: all 0.3s ease;
   }
- 
+
   .next-chapter-btn:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 8px 30px rgba(201,168,76,0.35);
   }
- 
+
   .next-chapter-btn:disabled { opacity: 0.4; cursor: not-allowed; }
- 
+
   .back-to-library-btn {
     background: transparent;
     border: 1px solid rgba(201,168,76,0.2);
@@ -710,7 +709,7 @@
     transition: all 0.2s;
   }
   .back-to-library-btn:hover { border-color: var(--gold); color: var(--gold); }
- 
+
   .end-of-book {
     text-align: center;
     padding: 2rem;
@@ -719,25 +718,25 @@
     font-size: 1.3rem;
     font-weight: 700;
   }
- 
+
   /* Fade in animation for chapter text */
   .chapter-content { animation: fadeIn 0.8s ease; }
- 
+
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
   }
- 
+
   @keyframes fadeInDown {
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
   }
- 
+
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
   }
- 
+
   /* Error */
   .error-msg {
     background: rgba(122,59,30,0.2);
@@ -749,13 +748,13 @@
     margin-top: 1rem;
     line-height: 1.5;
   }
- 
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
   ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.4); }
- 
+
   @media (max-width: 600px) {
     .library-header { padding: 1rem; }
     .library-body { padding: 1.5rem 1rem; }
@@ -767,7 +766,7 @@
 </style>
 </head>
 <body>
- 
+
 <!-- WELCOME SCREEN -->
 <div id="welcome-screen" class="screen active">
   <div class="logo-area">
@@ -775,11 +774,11 @@
     <div class="logo-title">ספריית הנצח</div>
     <div class="logo-subtitle">פנטזיה אפית · בסגנון ברנדון סנדרסון</div>
   </div>
- 
+
   <div class="welcome-card">
     <h2>ספר חדש מחכה לך</h2>
     <p>בחר את אורך ההרפתקה, הזן מפתח API, ולחץ על "צור ספר" — השאר קורה מאחורי הקלעים.</p>
- 
+
     <div class="length-options">
       <button class="length-btn selected" onclick="selectLength(this, 15)">
         <span class="chapters-count">15</span>
@@ -794,17 +793,17 @@
         פרקים<br><small style="color:rgba(245,239,227,0.4)">~2.5 שעות</small>
       </button>
     </div>
- 
+
     <div class="key-input-area">
       <label>מפתח Gemini API (חינמי)</label>
       <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" />
     </div>
- 
+
     <button class="create-btn" id="create-btn" onclick="startBookCreation()">✦ צור את הספר שלי ✦</button>
     <div id="welcome-error" class="error-msg" style="display:none"></div>
   </div>
 </div>
- 
+
 <!-- LOADING SCREEN -->
 <div id="loading-screen" class="screen">
   <div class="loading-rune">⚙</div>
@@ -812,7 +811,7 @@
   <div class="loading-status" id="loading-status">מגדיר מערכת קסם...</div>
   <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
 </div>
- 
+
 <!-- LIBRARY SCREEN -->
 <div id="library-screen" class="screen">
   <div class="library-header">
@@ -820,14 +819,14 @@
     <div class="book-title-display" id="header-book-title"></div>
     <button class="new-book-btn" onclick="newBook()">ספר חדש</button>
   </div>
- 
+
   <div class="library-body">
     <div class="book-info-panel" id="book-info-panel">
       <h1 id="book-title-main"></h1>
       <div class="book-meta" id="book-meta"></div>
       <div class="book-tagline" id="book-tagline"></div>
     </div>
- 
+
     <div class="progress-section">
       <div class="progress-label">
         <span>התקדמות</span>
@@ -837,9 +836,9 @@
         <div class="progress-fill" id="progress-fill" style="width:0%"></div>
       </div>
     </div>
- 
+
     <div class="chapter-list" id="chapter-list"></div>
- 
+
     <button class="write-next-btn" id="write-next-btn" onclick="writeNextChapter()">
       ✍️ כתוב את הפרק הבא
     </button>
@@ -850,7 +849,7 @@
     <div id="library-error" class="error-msg" style="display:none"></div>
   </div>
 </div>
- 
+
 <!-- READING SCREEN -->
 <div id="reading-screen" class="screen">
   <div class="reading-header">
@@ -858,20 +857,20 @@
     <div class="reading-chapter-label" id="reading-chapter-label"></div>
     <div style="width:60px"></div>
   </div>
- 
+
   <div class="reading-body">
     <div class="chapter-heading">
       <div class="chapter-number-display" id="reading-chapter-num"></div>
       <div class="chapter-title-display" id="reading-chapter-title"></div>
       <div class="chapter-epigraph" id="reading-chapter-epigraph"></div>
     </div>
- 
+
     <div class="chapter-content" id="reading-chapter-content"></div>
- 
+
     <div class="chapter-end-actions" id="chapter-end-actions"></div>
   </div>
 </div>
- 
+
 <script>
 // ===== STATE =====
 let state = {
@@ -883,46 +882,46 @@ let state = {
   writing: false,
   currentReadingChapter: 0
 };
- 
+
 const STORAGE_KEY = 'sanderson-library-v1';
- 
+
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
 }
- 
+
 function load() {
   try {
     const s = localStorage.getItem(STORAGE_KEY);
     if (s) state = JSON.parse(s);
   } catch(e) {}
 }
- 
+
 // ===== SCREEN MANAGEMENT =====
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   window.scrollTo(0, 0);
 }
- 
+
 function showLibrary() {
   renderLibrary();
   showScreen('library-screen');
 }
- 
+
 // ===== LENGTH SELECTION =====
 function selectLength(btn, n) {
   document.querySelectorAll('.length-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   state.totalChapters = n;
 }
- 
+
 // ===== API CALL =====
 async function callGemini(prompt, systemPrompt, maxTokens = 8192) {
   const messages = [{ role: 'user', content: prompt }];
   if (systemPrompt) messages.unshift({ role: 'user', content: `[הוראות מערכת: ${systemPrompt}]` });
- 
+
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${state.apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${state.apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -932,16 +931,16 @@ async function callGemini(prompt, systemPrompt, maxTokens = 8192) {
       })
     }
   );
- 
+
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(err?.error?.message || `שגיאת API: ${response.status}`);
   }
- 
+
   const data = await response.json();
   return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 }
- 
+
 // ===== BOOK CREATION =====
 async function startBookCreation() {
   const apiKey = document.getElementById('api-key-input').value.trim();
@@ -949,12 +948,12 @@ async function startBookCreation() {
     showError('welcome-error', 'אנא הזן מפתח API');
     return;
   }
- 
+
   state.apiKey = apiKey;
   document.getElementById('create-btn').disabled = true;
   document.getElementById('welcome-error').style.display = 'none';
   showScreen('loading-screen');
- 
+
   const statuses = [
     'מגדיר מערכת קסם...',
     'בונה את העולם...',
@@ -962,20 +961,20 @@ async function startBookCreation() {
     'מתכנן את העלילה...',
     'מכין את תוכן העניינים...'
   ];
- 
+
   let si = 0;
   const statusInterval = setInterval(() => {
     si = (si + 1) % statuses.length;
     document.getElementById('loading-status').textContent = statuses[si];
   }, 2000);
- 
+
   try {
     const bookData = await createBookBlueprint();
     state.book = bookData;
     state.chapters = [];
     state.eventLog = [];
     save();
- 
+
     clearInterval(statusInterval);
     renderLibrary();
     showScreen('library-screen');
@@ -986,19 +985,19 @@ async function startBookCreation() {
     showError('welcome-error', 'שגיאה ביצירת הספר: ' + e.message);
   }
 }
- 
+
 async function createBookBlueprint() {
   const n = state.totalChapters;
- 
+
   const prompt = `אתה מחבר פנטזיה אפית ברמת ברנדון סנדרסון. צור תוכנית מפורטת לספר פנטזיה מקורי בעברית.
- 
+
 הספר חייב לכלול:
 - מערכת קסם מקורית עם כללים ברורים ("Hard Magic System" בסגנון סנדרסון)
 - עולם מרתק עם תרבויות ייחודיות
 - 3-4 דמויות ראשיות עם קשתות אופי מורכבות
 - עלילה עם שיאים, טוויסטים, ועומק רגשי
 - בדיוק ${n} פרקים
- 
+
 החזר JSON בלבד, ללא הסברים, ללא קוד markdown, ללא שום טקסט מחוץ ל-JSON:
 {
   "title": "שם הספר",
@@ -1013,16 +1012,16 @@ async function createBookBlueprint() {
     {"number": 1, "title": "שם הפרק", "summary": "מה קורה בפרק זה (2-3 משפטים)", "pov": "שם הדמות שמנקודת מבטה"}
   ]
 }
- 
+
 חשוב: chapterOutlines חייב להכיל בדיוק ${n} פרקים. כל פרק עם number, title, summary, pov.`;
- 
+
   const raw = await callGemini(prompt, '', 4000);
- 
+
   // Strip markdown fences and extract JSON
   const cleaned = raw.replace(/`{3}json/gi, '').replace(/`{3}/g, '').trim();
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('תשובת ה-AI לא כללה JSON תקין — נסה שוב');
- 
+
   let book;
   try {
     book = JSON.parse(jsonMatch[0]);
@@ -1030,11 +1029,11 @@ async function createBookBlueprint() {
     try { book = JSON.parse(cleaned); }
     catch(e2) { throw new Error('שגיאה בפרסור JSON — נסה שוב'); }
   }
- 
+
   if (!book.title || !book.chapterOutlines || book.chapterOutlines.length === 0) {
     throw new Error('מבנה הספר שהתקבל אינו שלם');
   }
- 
+
   // Ensure we have exactly n chapters
   while (book.chapterOutlines.length < n) {
     const last = book.chapterOutlines.length;
@@ -1046,46 +1045,46 @@ async function createBookBlueprint() {
     });
   }
   book.chapterOutlines = book.chapterOutlines.slice(0, n);
- 
+
   return book;
 }
- 
+
 // ===== WRITE CHAPTER =====
 async function writeNextChapter() {
   if (state.writing) return;
- 
+
   const nextIdx = state.chapters.length;
   if (nextIdx >= state.totalChapters) return;
- 
+
   state.writing = true;
   document.getElementById('write-next-btn').disabled = true;
   document.getElementById('writing-indicator').style.display = 'flex';
   document.getElementById('library-error').style.display = 'none';
- 
+
   const outline = state.book.chapterOutlines[nextIdx];
   const chapterNum = nextIdx + 1;
- 
+
   document.getElementById('writing-status-text').textContent = `כותב פרק ${chapterNum}: "${outline.title}"...`;
- 
+
   try {
     const text = await writeChapter(nextIdx);
     state.chapters.push({ title: outline.title, text, number: chapterNum });
- 
+
     // Summarize and add to event log
     document.getElementById('writing-status-text').textContent = `מעבד יומן אירועים...`;
     const summary = await summarizeChapter(text, chapterNum, outline);
     if (!state.eventLog) state.eventLog = [];
     state.eventLog.push(`פרק ${chapterNum} (${outline.title}):\n${summary}`);
- 
+
     save();
- 
+
     state.writing = false;
     document.getElementById('writing-indicator').style.display = 'none';
     renderLibrary();
- 
+
     // Auto-open the newly written chapter
     openChapter(state.chapters.length - 1);
- 
+
   } catch(e) {
     state.writing = false;
     document.getElementById('write-next-btn').disabled = false;
@@ -1093,16 +1092,16 @@ async function writeNextChapter() {
     showError('library-error', 'שגיאה בכתיבת הפרק: ' + e.message);
   }
 }
- 
+
 // ===== SUMMARIZE CHAPTER (event log) =====
 async function summarizeChapter(chapterText, chapterNum, outline) {
   const prompt = `קרא את הפרק הבא מספר פנטזיה וסכם אותו ב-4-6 משפטים קצרים בעברית.
 הסיכום חייב לכלול: אירועים מרכזיים שקרו, החלטות חשובות של דמויות, שינויים במצב העולם, וכל מידע שחיוני להמשך הסיפור.
 כתוב בצורת נקודות: "- [אירוע]". ללא הקדמה, ללא סיכום כללי — רק עובדות.
- 
+
 פרק ${chapterNum} — ${outline.title}:
 ${chapterText.substring(0, 3000)}`;
- 
+
   try {
     const summary = await callGemini(prompt, '', 800);
     return summary.trim();
@@ -1111,17 +1110,17 @@ ${chapterText.substring(0, 3000)}`;
     return `פרק ${chapterNum}: ${chapterText.substring(0, 200)}...`;
   }
 }
- 
+
 async function writeChapter(idx) {
   const book = state.book;
   const outline = book.chapterOutlines[idx];
- 
+
   // Build event log context — full history of what happened
   let eventLogContext = '';
   if (idx > 0 && state.eventLog && state.eventLog.length > 0) {
     eventLogContext = `**יומן אירועים — מה קרה עד כה:**\n${state.eventLog.join('\n\n')}`;
   }
- 
+
   // Last chapter's closing lines for narrative continuity
   let lastChapterSnippet = '';
   if (idx > 0 && state.chapters.length > 0) {
@@ -1129,21 +1128,21 @@ async function writeChapter(idx) {
     const lines = last.text.split('\n').filter(l => l.trim()).slice(-4).join(' ');
     lastChapterSnippet = `**שורות הסיום של הפרק הקודם (לרצף נרטיבי):**\n"${lines.substring(0, 500)}..."`;
   }
- 
+
   const prompt = `אתה ברנדון סנדרסון הכותב ספר פנטזיה אפי בעברית.
- 
+
 **פרטי הספר:**
 שם: ${book.title}
 עולם: ${book.world}
 מערכת קסם: ${book.magicSystem}
 דמויות ראשיות: ${book.mainCharacters?.map(c => `${c.name} (${c.role})`).join(', ')}
- 
+
 **פרק לכתיבה:**
 מספר: ${outline.number}
 כותרת: ${outline.title}
 תוכן: ${outline.summary}
 נקודת מבט: ${outline.pov}
- 
+
 ${eventLogContext ? eventLogContext + '\n\n' : ''}${lastChapterSnippet ? lastChapterSnippet + '\n\n' : ''}**הנחיות:**
 - כתוב פרק שלם ומגובש בעברית ספרותית יפה
 - 1800-2500 מילים
@@ -1154,51 +1153,51 @@ ${eventLogContext ? eventLogContext + '\n\n' : ''}${lastChapterSnippet ? lastCha
 - סיים עם hook שמשאיר את הקורא מחכה לפרק הבא
 - חלק את הפרק ל-3-4 סצנות עם מעברים [***]
 - כתוב פרוזה בלבד — ללא כותרת, ללא מספר פרק, ללא הסברים`;
- 
+
   const text = await callGemini(prompt, '', 8192);
   if (!text || text.length < 200) throw new Error('הפרק שהתקבל קצר מדי');
   return text.trim();
 }
- 
+
 // ===== RENDER LIBRARY =====
 function renderLibrary() {
   if (!state.book) return;
- 
+
   const book = state.book;
   const writtenCount = state.chapters.length;
   const total = state.totalChapters;
- 
+
   // Header
   document.getElementById('header-book-title').textContent = book.title;
- 
+
   // Book info
   document.getElementById('book-title-main').textContent = book.title;
   document.getElementById('book-meta').innerHTML =
     `<span>📚 ${total} פרקים</span><span>✨ ${book.genre || 'פנטזיה אפית'}</span><span>👁 ${writtenCount} נכתבו</span>`;
   document.getElementById('book-tagline').textContent = book.tagline || '';
- 
+
   // Progress
   const pct = total > 0 ? Math.round((writtenCount / total) * 100) : 0;
   document.getElementById('progress-text').textContent = `${writtenCount} / ${total} פרקים`;
   document.getElementById('progress-fill').style.width = pct + '%';
- 
+
   // Chapter list
   const list = document.getElementById('chapter-list');
   list.innerHTML = '';
- 
+
   for (let i = 0; i < total; i++) {
     const outline = book.chapterOutlines[i] || { title: `פרק ${i+1}`, summary: '', pov: '' };
     const isWritten = i < writtenCount;
     const isNext = i === writtenCount;
     const isLocked = i > writtenCount;
- 
+
     const btn = document.createElement('button');
     btn.className = `chapter-item ${isWritten ? 'written' : isNext ? 'next-to-write' : 'locked'}`;
- 
+
     const statusLabel = isWritten ? '<span class="chapter-status done">✓</span>' :
                         isNext ? '<span class="chapter-status write">✍</span>' :
                         '<span class="chapter-status lock">🔒</span>';
- 
+
     btn.innerHTML = `
       <span class="chapter-num">${i+1}</span>
       <div class="chapter-info">
@@ -1207,15 +1206,15 @@ function renderLibrary() {
       </div>
       ${statusLabel}
     `;
- 
+
     if (isWritten) {
       const capturedIdx = i;
       btn.onclick = () => openChapter(capturedIdx);
     }
- 
+
     list.appendChild(btn);
   }
- 
+
   // Write next button
   const writeBtn = document.getElementById('write-next-btn');
   if (writtenCount >= total) {
@@ -1233,23 +1232,23 @@ function renderLibrary() {
     writeBtn.disabled = state.writing;
   }
 }
- 
+
 // ===== OPEN CHAPTER =====
 function openChapter(idx) {
   const chapter = state.chapters[idx];
   if (!chapter) return;
- 
+
   state.currentReadingChapter = idx;
- 
+
   document.getElementById('reading-chapter-label').textContent = `פרק ${chapter.number} מתוך ${state.totalChapters}`;
   document.getElementById('reading-chapter-num').textContent = `פרק ${chapter.number}`;
   document.getElementById('reading-chapter-title').textContent = chapter.title;
- 
+
   // Epigraph from book outline
   const outline = state.book?.chapterOutlines?.[idx];
   document.getElementById('reading-chapter-epigraph').textContent =
     outline?.pov ? `נקודת מבט: ${outline.pov}` : '';
- 
+
   // Format content
   const contentEl = document.getElementById('reading-chapter-content');
   const paragraphs = chapter.text
@@ -1263,16 +1262,16 @@ function openChapter(idx) {
       return `<p>${p}</p>`;
     })
     .join('');
- 
+
   contentEl.innerHTML = paragraphs;
- 
+
   // End actions
   const endEl = document.getElementById('chapter-end-actions');
   endEl.innerHTML = '';
- 
+
   const isLast = idx === state.totalChapters - 1;
   const nextWritten = idx + 1 < state.chapters.length;
- 
+
   if (!isLast) {
     if (nextWritten) {
       const nextBtn = document.createElement('button');
@@ -1296,23 +1295,23 @@ function openChapter(idx) {
     doneMsg.textContent = '✦ סוף ✦';
     endEl.appendChild(doneMsg);
   }
- 
+
   const backBtn = document.createElement('button');
   backBtn.className = 'back-to-library-btn';
   backBtn.textContent = 'חזרה לתוכן העניינים';
   backBtn.onclick = showLibrary;
   endEl.appendChild(backBtn);
- 
+
   showScreen('reading-screen');
   window.scrollTo(0, 0);
 }
- 
+
 // ===== UTILS =====
 function showError(id, msg) {
   const el = document.getElementById(id);
   if (el) { el.textContent = msg; el.style.display = 'block'; }
 }
- 
+
 function newBook() {
   if (!confirm('ליצור ספר חדש? הספר הנוכחי יימחק.')) return;
   state.book = null;
@@ -1324,10 +1323,10 @@ function newBook() {
   document.getElementById('create-btn').disabled = false;
   document.getElementById('welcome-error').style.display = 'none';
 }
- 
+
 // ===== INIT =====
 load();
- 
+
 if (state.book) {
   // Restore previous session
   renderLibrary();
@@ -1338,4 +1337,3 @@ if (state.book) {
 </script>
 </body>
 </html>
- 
