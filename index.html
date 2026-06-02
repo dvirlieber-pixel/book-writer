@@ -299,6 +299,9 @@
   #library-screen {
     flex-direction: column;
     min-height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
   }
 
   .library-header {
@@ -349,7 +352,28 @@
     max-width: 680px;
     margin: 0 auto;
     width: 100%;
-    padding: 2rem 1.5rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .library-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.25rem 1.5rem 0.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .library-footer {
+    flex-shrink: 0;
+    padding: 1rem 1.5rem 1.25rem;
+    border-top: 1px solid rgba(201,168,76,0.2);
+    background: rgba(26,20,16,0.92);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.35);
   }
 
   /* Book info panel */
@@ -357,8 +381,8 @@
     background: rgba(201,168,76,0.05);
     border: 1px solid rgba(201,168,76,0.15);
     border-radius: 2px;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
+    padding: 1rem 1.15rem;
+    margin-bottom: 1rem;
   }
 
   .book-info-panel h1 {
@@ -388,7 +412,7 @@
 
   /* Progress bar */
   .progress-section {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
   }
 
   .progress-label {
@@ -414,13 +438,49 @@
   }
 
   /* Chapter list */
-  .chapter-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .chapter-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--gold-dim);
+  }
+  .chapter-list-toggle {
+    background: none;
+    border: none;
+    color: var(--gold);
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+  }
+  .chapter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: min(42vh, 360px);
+    overflow-y: auto;
+    padding-left: 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chapter-item.compact-locked {
+    justify-content: center;
+    opacity: 0.55;
+    cursor: pointer;
+    padding: 0.65rem;
+  }
+  .chapter-item.compact-locked:hover {
+    opacity: 0.85;
+    border-color: rgba(201,168,76,0.2);
+  }
 
   .chapter-item {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0.9rem 1.2rem;
+    gap: 0.75rem;
+    padding: 0.65rem 0.9rem;
     border: 1px solid transparent;
     border-radius: 1px;
     cursor: pointer;
@@ -511,7 +571,7 @@
     letter-spacing: 0.05em;
     transition: all 0.3s ease;
     border-radius: 1px;
-    margin-top: 1.5rem;
+    margin-top: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -626,8 +686,8 @@
     flex-wrap: wrap;
     gap: 0.5rem;
     justify-content: center;
-    margin-top: 1rem;
   }
+  .library-actions { margin-top: 0.65rem; }
   .secondary-btn {
     background: rgba(201,168,76,0.08);
     border: 1px solid rgba(201,168,76,0.35);
@@ -642,8 +702,9 @@
   .book-complete-actions {
     flex-direction: column;
     align-items: center;
-    padding: 1.5rem;
-    margin-top: 1rem;
+    padding: 1rem;
+    margin-top: 0.75rem;
+    margin-bottom: 0.5rem;
     border: 1px solid rgba(201,168,76,0.25);
     background: rgba(201,168,76,0.05);
   }
@@ -1135,33 +1196,42 @@
   </div>
 
   <div class="library-body">
-    <div class="book-info-panel" id="book-info-panel">
-      <h1 id="book-title-main"></h1>
-      <div class="book-meta" id="book-meta"></div>
-      <div class="book-tagline" id="book-tagline"></div>
-    </div>
-
-    <div class="progress-section">
-      <div class="progress-label">
-        <span>זמין לקריאה</span>
-        <span id="progress-text">0 / 0 פרקים</span>
+    <div class="library-scroll">
+      <div class="book-info-panel" id="book-info-panel">
+        <h1 id="book-title-main"></h1>
+        <div class="book-meta" id="book-meta"></div>
+        <div class="book-tagline" id="book-tagline"></div>
       </div>
-      <div class="progress-track">
-        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+
+      <div class="progress-section">
+        <div class="progress-label">
+          <span>זמין לקריאה</span>
+          <span id="progress-text">0 / 0 פרקים</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+        </div>
       </div>
+
+      <div class="chapter-list-header">
+        <span>תוכן עניינים</span>
+        <button type="button" class="chapter-list-toggle" id="chapter-list-toggle" style="display:none"></button>
+      </div>
+      <div class="chapter-list" id="chapter-list"></div>
+      <div id="book-complete-slot"></div>
     </div>
 
-    <div class="chapter-list" id="chapter-list"></div>
-
-    <button class="write-next-btn" id="write-next-btn" onclick="readNextChapter()">
-      📖 התחל לקרוא
-    </button>
-    <div class="writing-indicator" id="writing-indicator" style="display:none">
-      <span class="dot-anim"><span>•</span><span>•</span><span>•</span></span>
-      <span id="writing-status-text">מכין את הפרק...</span>
+    <div class="library-footer">
+      <button class="write-next-btn" id="write-next-btn" onclick="readNextChapter()">
+        📖 התחל לקרוא
+      </button>
+      <div class="writing-indicator" id="writing-indicator" style="display:none">
+        <span class="dot-anim"><span>•</span><span>•</span><span>•</span></span>
+        <span id="writing-status-text">מכין את הפרק...</span>
+      </div>
+      <div class="library-actions" id="library-actions"></div>
+      <div id="library-error" class="error-msg" style="display:none"></div>
     </div>
-    <div class="library-actions" id="library-actions"></div>
-    <div id="library-error" class="error-msg" style="display:none"></div>
   </div>
 </div>
 
@@ -1232,7 +1302,8 @@ function createEmptyBookState() {
     parentBookId: null,
     seriesTitle: '',
     sequelIndex: 1,
-    rating: 0
+    rating: 0,
+    expandChapterList: false
   };
 }
 
@@ -1255,7 +1326,8 @@ function bookSnapshot() {
     parentBookId: state.parentBookId || null,
     seriesTitle: state.seriesTitle || state.book?.title || '',
     sequelIndex: state.sequelIndex || 1,
-    rating: state.rating || 0
+    rating: state.rating || 0,
+    expandChapterList: !!state.expandChapterList
   };
 }
 
@@ -1429,8 +1501,9 @@ function setBookRating(stars) {
 }
 
 function renderBookCompletePanel() {
-  const existing = document.getElementById('book-complete-actions');
-  if (existing) existing.remove();
+  const slot = document.getElementById('book-complete-slot');
+  if (!slot) return;
+  slot.innerHTML = '';
   if (!isBookComplete()) return;
 
   const panel = document.createElement('div');
@@ -1445,21 +1518,23 @@ function renderBookCompletePanel() {
     <h3>✦ הספר הושלם${seriesNote} ✦</h3>
     <p style="font-size:0.85rem;color:rgba(245,239,227,0.55);margin-bottom:0.5rem">איך היה?</p>
     <div class="rating-row">${stars}</div>
-    <div class="complete-btn-row">
-      <button type="button" class="secondary-btn" onclick="exportBookEpub()">📥 הורד EPUB</button>
-      <button type="button" class="secondary-btn" onclick="exportBookHtml()">📄 הורד HTML</button>
-      <button type="button" class="secondary-btn" onclick="promptSequelBook()">🌍 ספר הבא באותו עולם</button>
-    </div>`;
+    <p style="font-size:0.78rem;color:rgba(245,239,227,0.45);margin-top:0.75rem">הורדה והמשך בעולם — למטה</p>`;
 
-  const list = document.getElementById('chapter-list');
-  if (list?.parentNode) list.parentNode.appendChild(panel);
+  slot.appendChild(panel);
+}
+
+function shouldRenderChapterInList(i, writtenCount, total, expanded) {
+  if (expanded || total <= 12) return true;
+  if (i < writtenCount) return true;
+  if (i === writtenCount && writtenCount < total) return true;
+  return false;
 }
 
 function renderLibraryActions() {
   const el = document.getElementById('library-actions');
   if (!el) return;
   el.innerHTML = '';
-  if (!state.chapters.length) return;
+  if (!state.chapters.length && !isBookComplete()) return;
 
   const partial = state.chapters.length < state.totalChapters;
   const epubBtn = document.createElement('button');
@@ -2679,10 +2754,24 @@ function renderLibrary() {
 
   // Book info
   document.getElementById('book-title-main').textContent = book.title;
-  const oldComplete = document.getElementById('book-complete-msg');
-  if (oldComplete) oldComplete.remove();
-  const oldCompleteActions = document.getElementById('book-complete-actions');
-  if (oldCompleteActions) oldCompleteActions.remove();
+  const slot = document.getElementById('book-complete-slot');
+  if (slot) slot.innerHTML = '';
+
+  const expanded = !!state.expandChapterList;
+  const toggle = document.getElementById('chapter-list-toggle');
+  if (toggle) {
+    if (total > 12) {
+      toggle.style.display = 'inline';
+      toggle.textContent = expanded ? 'הצג תמצית' : `הצג את כל ${total} הפרקים`;
+      toggle.onclick = () => {
+        state.expandChapterList = !expanded;
+        save();
+        renderLibrary();
+      };
+    } else {
+      toggle.style.display = 'none';
+    }
+  }
 
   const seriesBadge = state.sequelIndex > 1
     ? `<span>📜 ספר ${state.sequelIndex} · ${state.seriesTitle || book.title}</span>` : '';
@@ -2702,10 +2791,11 @@ function renderLibrary() {
   list.innerHTML = '';
 
   for (let i = 0; i < total; i++) {
+    if (!shouldRenderChapterInList(i, writtenCount, total, expanded)) continue;
+
     const outline = book.chapterOutlines[i] || { title: `פרק ${i+1}`, summary: '', pov: '' };
     const isWritten = i < writtenCount;
     const isNext = i === writtenCount;
-    const isLocked = i > writtenCount;
 
     const btn = document.createElement('button');
     btn.className = `chapter-item ${isWritten ? 'written' : isNext ? 'next-to-write' : 'locked'}`;
@@ -2733,6 +2823,30 @@ function renderLibrary() {
     }
 
     list.appendChild(btn);
+  }
+
+  if (!expanded && total > 12) {
+    const hiddenStart = writtenCount < total ? writtenCount + 1 : writtenCount;
+    const hiddenCount = total - hiddenStart;
+    if (hiddenCount > 0) {
+      const compact = document.createElement('button');
+      compact.type = 'button';
+      compact.className = 'chapter-item compact-locked';
+      compact.innerHTML = `<span class="chapter-hint" style="font-style:normal">🔒 עוד ${hiddenCount} פרקים ייפתחו בהמשך · לחץ להציג הכל</span>`;
+      compact.onclick = () => {
+        state.expandChapterList = true;
+        save();
+        renderLibrary();
+      };
+      list.appendChild(compact);
+    }
+  }
+
+  if (!expanded && writtenCount < total) {
+    requestAnimationFrame(() => {
+      const nextEl = list.querySelector('.next-to-write');
+      if (nextEl) nextEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
   }
 
   // Write next button
