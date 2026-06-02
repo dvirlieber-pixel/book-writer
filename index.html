@@ -1085,6 +1085,38 @@
   </div>
 </div>
 
+<!-- SEQUEL SETUP SCREEN -->
+<div id="sequel-screen" class="screen">
+  <div class="logo-area" style="padding-top:2rem">
+    <div class="logo-symbol">🌍</div>
+    <div class="logo-title" style="font-size:2rem">המשך בעולם הזה</div>
+  </div>
+  <div class="welcome-card">
+    <h2>ספר חדש באותו עולם</h2>
+    <p id="sequel-parent-info" style="margin-bottom:1.25rem"></p>
+    <p style="font-size:0.8rem;color:var(--gold-dim);margin-bottom:0.5rem">כמה פרקים בספר המשך?</p>
+    <div class="length-options" id="sequel-length-options">
+      <button type="button" class="length-btn selected" data-length="15" onclick="selectSequelLength(this, 15)">
+        <span class="chapters-count">15</span>
+        פרקים<br><small style="color:rgba(245,239,227,0.4)">~45 דקות</small>
+      </button>
+      <button type="button" class="length-btn" data-length="30" onclick="selectSequelLength(this, 30)">
+        <span class="chapters-count">30</span>
+        פרקים<br><small style="color:rgba(245,239,227,0.4)">~90 דקות</small>
+      </button>
+      <button type="button" class="length-btn" data-length="50" onclick="selectSequelLength(this, 50)">
+        <span class="chapters-count">50</span>
+        פרקים<br><small style="color:rgba(245,239,227,0.4)">~2.5 שעות</small>
+      </button>
+    </div>
+    <button class="create-btn" onclick="confirmSequelBook()">✦ פתח את ספר המשך ✦</button>
+    <div class="welcome-links">
+      <button type="button" onclick="cancelSequelSetup()">ביטול</button>
+    </div>
+    <div id="sequel-error" class="error-msg" style="display:none"></div>
+  </div>
+</div>
+
 <!-- LOADING SCREEN -->
 <div id="loading-screen" class="screen">
   <div class="loading-rune">⚙</div>
@@ -1178,6 +1210,8 @@ const TASTES = {
 let app = { apiKey: '', currentBookId: null, books: {}, readingPrefs: { fontScale: 1, theme: 'dark' } };
 let state = createEmptyBookState();
 let selectedTaste = 'hard-magic';
+let pendingSequelSourceId = null;
+let pendingSequelLength = 15;
 
 function createEmptyBookState() {
   return {
@@ -1414,7 +1448,7 @@ function renderBookCompletePanel() {
     <div class="complete-btn-row">
       <button type="button" class="secondary-btn" onclick="exportBookEpub()">📥 הורד EPUB</button>
       <button type="button" class="secondary-btn" onclick="exportBookHtml()">📄 הורד HTML</button>
-      <button type="button" class="secondary-btn" onclick="startSequelBook()">🌍 ספר הבא באותו עולם</button>
+      <button type="button" class="secondary-btn" onclick="promptSequelBook()">🌍 ספר הבא באותו עולם</button>
     </div>`;
 
   const list = document.getElementById('chapter-list');
@@ -1444,7 +1478,7 @@ function renderLibraryActions() {
     const sequelBtn = document.createElement('button');
     sequelBtn.className = 'secondary-btn';
     sequelBtn.textContent = '🌍 המשך בעולם הזה';
-    sequelBtn.onclick = () => startSequelBook();
+    sequelBtn.onclick = () => promptSequelBook();
     el.appendChild(sequelBtn);
   }
 }
@@ -2067,7 +2101,7 @@ ${memoryJson}
   return book;
 }
 
-async function startSequelBook(sourceId) {
+function promptSequelBook(sourceId) {
   if (state.book && state.id) app.books[state.id] = bookSnapshot();
 
   const parent = sourceId ? app.books[sourceId] : bookSnapshot();
@@ -2080,10 +2114,58 @@ async function startSequelBook(sourceId) {
     return;
   }
 
+  pendingSequelSourceId = parent.id;
+  pendingSequelLength = 15;
+
+  const info = document.getElementById('sequel-parent-info');
+  if (info) {
+    const series = parent.seriesTitle || parent.book.title;
+    const num = parent.sequelIndex || 1;
+    info.textContent = `ממשיך את «${series}» (אחרי «${parent.book.title}») — זה יהיה ספר ${num + 1} בסדרה.`;
+  }
+
+  document.querySelectorAll('#sequel-length-options .length-btn').forEach(b => {
+    b.classList.toggle('selected', Number(b.dataset.length) === 15);
+  });
+  const err = document.getElementById('sequel-error');
+  if (err) err.style.display = 'none';
+
+  showScreen('sequel-screen');
+}
+
+function selectSequelLength(btn, n) {
+  document.querySelectorAll('#sequel-length-options .length-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  pendingSequelLength = n;
+}
+
+function cancelSequelSetup() {
+  pendingSequelSourceId = null;
+  if (state.book) showLibrary();
+  else showShelf();
+}
+
+async function confirmSequelBook() {
+  if (!pendingSequelSourceId) {
+    cancelSequelSetup();
+    return;
+  }
+  const err = document.getElementById('sequel-error');
+  if (err) err.style.display = 'none';
+  await startSequelBook(pendingSequelSourceId, pendingSequelLength);
+}
+
+async function startSequelBook(sourceId, chapterCount) {
+  const parent = app.books[sourceId] || bookSnapshot();
+  if (!parent?.book || !isBookComplete(parent)) {
+    showError('sequel-error', 'לא ניתן לפתוח המשך — הספר הקודם לא הושלם');
+    return;
+  }
+
   const apiKey = getStoredApiKey();
   if (!apiKey) {
     openWelcomeApiSettings();
-    showError('welcome-error', 'נדרש מפתח API לפני פתיחת ספר המשך');
+    showError('sequel-error', 'נדרש מפתח API — חזור אחרי שהגדרת מפתח');
     return;
   }
 
@@ -2094,7 +2176,8 @@ async function startSequelBook(sourceId) {
   state.id = newBookId();
   state.apiKey = apiKey;
   state.taste = parent.taste || selectedTaste;
-  state.totalChapters = parent.totalChapters || 15;
+  state.totalChapters = chapterCount || pendingSequelLength || 15;
+  pendingSequelSourceId = null;
   state.parentBookId = parent.id;
   state.seriesTitle = parent.seriesTitle || parent.book.title;
   state.sequelIndex = (parent.sequelIndex || 1) + 1;
@@ -2123,8 +2206,11 @@ async function startSequelBook(sourceId) {
     document.getElementById('create-btn').disabled = false;
   } catch(e) {
     document.getElementById('create-btn').disabled = false;
-    showScreen('library-screen');
     delete app.books[state.id];
+    applyBookSnapshot(parent);
+    app.currentBookId = parent.id;
+    save();
+    showScreen('library-screen');
     showError('library-error', 'שגיאה ביצירת ספר המשך: ' + e.message);
   }
 }
@@ -2739,7 +2825,7 @@ function openChapter(idx) {
       const row = document.createElement('div');
       row.className = 'complete-btn-row';
       row.style.marginTop = '1rem';
-      [['📥 EPUB', () => exportBookEpub()], ['🌍 המשך בעולם', () => startSequelBook()]]
+      [['📥 EPUB', () => exportBookEpub()], ['🌍 המשך בעולם', () => promptSequelBook()]]
         .forEach(([label, fn]) => {
           const b = document.createElement('button');
           b.type = 'button';
