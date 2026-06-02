@@ -820,11 +820,80 @@
   }
   .rating-star.on { opacity: 1; filter: none; }
 
-  .taste-options {
+  .choice-section { margin: 1.1rem 0 0.25rem; }
+  .choice-label {
+    font-size: 0.78rem;
+    color: var(--gold-dim);
+    margin-bottom: 0.45rem;
+    display: block;
+  }
+  .choice-tiles {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-    margin: 1.25rem 0;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.45rem;
+  }
+  .choice-tiles.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 520px) {
+    .choice-tiles.cols-3 { grid-template-columns: repeat(2, 1fr); }
+  }
+  .choice-tile {
+    background: var(--surface-subtle);
+    border: 1px solid var(--border);
+    color: var(--parchment);
+    padding: 0.55rem 0.4rem;
+    font-family: inherit;
+    font-size: 0.76rem;
+    line-height: 1.35;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 1px;
+    text-align: center;
+  }
+  .choice-tile:hover, .choice-tile.selected {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.1);
+    color: var(--gold);
+  }
+  .optional-input {
+    width: 100%;
+    margin-top: 0.45rem;
+    padding: 0.5rem 0.65rem;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--parchment);
+    font-family: inherit;
+    font-size: 0.82rem;
+    border-radius: 1px;
+    display: none;
+  }
+  .optional-input.visible { display: block; }
+  .hook-field {
+    width: 100%;
+    min-height: 4.5rem;
+    margin-top: 0.35rem;
+    padding: 0.65rem 0.75rem;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--parchment);
+    font-family: inherit;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    border-radius: 1px;
+    resize: vertical;
+  }
+  .inspiration-details { margin: 0.75rem 0; }
+  .inspiration-details summary {
+    cursor: pointer;
+    color: var(--gold-dim);
+    font-size: 0.82rem;
+    list-style: none;
+  }
+  .inspiration-details summary::-webkit-details-marker { display: none; }
+  .copyright-note {
+    font-size: 0.72rem;
+    color: var(--text-faint);
+    margin-top: 0.35rem;
+    line-height: 1.45;
   }
   .taste-btn {
     background: var(--surface-subtle);
@@ -836,12 +905,9 @@
     cursor: pointer;
     transition: all 0.2s;
     border-radius: 1px;
+    width: 100%;
   }
-  .taste-btn:hover, .taste-btn.selected {
-    border-color: var(--gold);
-    background: rgba(201,168,76,0.1);
-    color: var(--gold);
-  }
+  .taste-btn:hover { border-color: var(--gold); color: var(--gold); }
 
   .welcome-links {
     margin-top: 1rem;
@@ -1461,34 +1527,90 @@
 
   <div class="welcome-card">
     <h2>ספר חדש מחכה לך</h2>
-    <p>בחר אורך, לחץ "פתח ספר" — והתחל לקרוא. העולם והפרקים נבנים מאחורי הקלעים.</p>
+    <p>בחר ז'אנר, טון, או רעיון — ולחץ "פתח ספר". הפרקים נבנים מאחורי הקלעים. מספיק <strong>בחירה אחת</strong> מהמסך (או רעיון חופשי).</p>
 
     <div class="taste-profiles">
-      <div class="taste-profiles-label">פרופיל קריאה (שמירה אוטומטית)</div>
+      <div class="taste-profiles-label">פרופילים שמורים (ז'אנר + טון + אורך)</div>
       <div class="profile-options" id="profile-options"></div>
     </div>
 
-    <p style="font-size:0.8rem;color:var(--gold-dim);margin-bottom:0.5rem">איזה סוג הרפתקה?</p>
-    <div class="taste-options" id="taste-options">
-      <button type="button" class="taste-btn selected" data-taste="hard-magic" onclick="selectTaste(this,'hard-magic')">קסם קשה</button>
-      <button type="button" class="taste-btn" data-taste="mystery" onclick="selectTaste(this,'mystery')">מסתורין</button>
-      <button type="button" class="taste-btn" data-taste="war" onclick="selectTaste(this,'war')">מלחמה ופוליטיקה</button>
-      <button type="button" class="taste-btn" data-taste="character" onclick="selectTaste(this,'character')">דמויות ויחסים</button>
+    <div class="choice-section">
+      <label class="choice-label">רעיון לספר (אופציונלי)</label>
+      <textarea id="hook-input" class="hook-field" placeholder="למשל: בלש פרטי בתל אביב חוקר רצח מסתורי. אם תשאיר ריק — נמציא."></textarea>
     </div>
 
-    <div class="length-options">
-      <button class="length-btn selected" onclick="selectLength(this, 15)">
-        <span class="chapters-count">15</span>
-        פרקים<br><small class="length-hint">~45 דקות</small>
-      </button>
-      <button class="length-btn" onclick="selectLength(this, 30)">
-        <span class="chapters-count">30</span>
-        פרקים<br><small class="length-hint">~90 דקות</small>
-      </button>
-      <button class="length-btn" onclick="selectLength(this, 50)">
-        <span class="chapters-count">50</span>
-        פרקים<br><small class="length-hint">~2.5 שעות</small>
-      </button>
+    <div class="choice-section">
+      <span class="choice-label">ז'אנר מוביל</span>
+      <div class="choice-tiles" id="genre-tiles">
+        <button type="button" class="choice-tile" data-group="genre" data-value="fantasy" onclick="selectChoice(this)">🐉 פנטזיה</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="scifi" onclick="selectChoice(this)">🚀 מדע בדיוני</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="mystery" onclick="selectChoice(this)">🕵️‍♂️ מתח</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="horror" onclick="selectChoice(this)">🖤 אימה</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="romance" onclick="selectChoice(this)">❤️ רומן</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="historical" onclick="selectChoice(this)">⚔️ היסטורי</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="other" onclick="selectChoice(this)">✏️ אחר...</button>
+      </div>
+      <input type="text" id="genre-custom" class="optional-input" placeholder="ז'אנר אחר..." maxlength="80" />
+    </div>
+
+    <div class="choice-section">
+      <span class="choice-label">אווירה וטון</span>
+      <div class="choice-tiles" id="tone-tiles">
+        <button type="button" class="choice-tile" data-group="tone" data-value="grimdark" onclick="selectChoice(this)">🕯️ אפל</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="classic" onclick="selectChoice(this)">✨ קלאסי</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="action" onclick="selectChoice(this)">⚡ אקשן</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="humor" onclick="selectChoice(this)">☕ הומור</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="philosophical" onclick="selectChoice(this)">🧠 עמוק</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="other" onclick="selectChoice(this)">✏️ אחר...</button>
+      </div>
+      <input type="text" id="tone-custom" class="optional-input" placeholder="טון אחר..." maxlength="80" />
+    </div>
+
+    <details class="inspiration-details">
+      <summary>✦ השראה מתקדמת (אופציונלי)</summary>
+      <p class="copyright-note">השראה בלבד — לא חיקוי דמויות, עלילות או סגנון מועתק.</p>
+      <div class="choice-section">
+        <span class="choice-label">סופר</span>
+        <div class="choice-tiles cols-3" id="author-tiles">
+          <button type="button" class="choice-tile" data-group="author" data-value="sanderson" onclick="selectChoice(this)">🎩 סנדרסון</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="martin" onclick="selectChoice(this)">👑 מרטין</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="rowling" onclick="selectChoice(this)">🔮 רולינג</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="christie" onclick="selectChoice(this)">🕵️‍♀️ כריסטי</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="dick" onclick="selectChoice(this)">👽 דיק</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="other" onclick="selectChoice(this)">✏️ אחר</button>
+        </div>
+        <input type="text" id="author-custom" class="optional-input" placeholder="סופר אחר..." maxlength="60" />
+      </div>
+      <div class="choice-section">
+        <span class="choice-label">ספר</span>
+        <div class="choice-tiles cols-3" id="bookref-tiles">
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="lotr" onclick="selectChoice(this)">💍 שר הטבעות</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="harry" onclick="selectChoice(this)">⚡ הארי פוטר</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="thrones" onclick="selectChoice(this)">🃏 משחקי הכס</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="dune" onclick="selectChoice(this)">🏜️ חולית</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="sherlock" onclick="selectChoice(this)">🕵️‍♂️ שרלוק</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="other" onclick="selectChoice(this)">✏️ אחר</button>
+        </div>
+        <input type="text" id="bookref-custom" class="optional-input" placeholder="ספר אחר..." maxlength="60" />
+      </div>
+    </details>
+
+    <div class="choice-section">
+      <span class="choice-label">אורך קריאה</span>
+      <div class="length-options" id="length-presets">
+        <button type="button" class="length-btn selected" data-length="short" onclick="selectReadingLength(this, 'short')">
+          <span class="chapters-count">קצר</span>
+          <small class="length-hint">~שעה</small>
+        </button>
+        <button type="button" class="length-btn" data-length="medium" onclick="selectReadingLength(this, 'medium')">
+          <span class="chapters-count">בינוני</span>
+          <small class="length-hint">~ערב</small>
+        </button>
+        <button type="button" class="length-btn" data-length="long" onclick="selectReadingLength(this, 'long')">
+          <span class="chapters-count">ארוך</span>
+          <small class="length-hint">מסע מלא</small>
+        </button>
+      </div>
     </div>
 
     <details class="api-settings" id="api-settings-details">
@@ -1566,19 +1688,19 @@
   <div class="welcome-card">
     <h2>ספר חדש באותו עולם</h2>
     <p id="sequel-parent-info" style="margin-bottom:1.25rem"></p>
-    <p style="font-size:0.8rem;color:var(--gold-dim);margin-bottom:0.5rem">כמה פרקים בספר המשך?</p>
+    <p style="font-size:0.8rem;color:var(--gold-dim);margin-bottom:0.5rem">אורך ספר המשך</p>
     <div class="length-options" id="sequel-length-options">
-      <button type="button" class="length-btn selected" data-length="15" onclick="selectSequelLength(this, 15)">
-        <span class="chapters-count">15</span>
-        פרקים<br><small class="length-hint">~45 דקות</small>
+      <button type="button" class="length-btn selected" data-length="short" onclick="selectSequelLength(this, 'short')">
+        <span class="chapters-count">קצר</span>
+        <small class="length-hint">~שעה</small>
       </button>
-      <button type="button" class="length-btn" data-length="30" onclick="selectSequelLength(this, 30)">
-        <span class="chapters-count">30</span>
-        פרקים<br><small class="length-hint">~90 דקות</small>
+      <button type="button" class="length-btn" data-length="medium" onclick="selectSequelLength(this, 'medium')">
+        <span class="chapters-count">בינוני</span>
+        <small class="length-hint">~ערב</small>
       </button>
-      <button type="button" class="length-btn" data-length="50" onclick="selectSequelLength(this, 50)">
-        <span class="chapters-count">50</span>
-        פרקים<br><small class="length-hint">~2.5 שעות</small>
+      <button type="button" class="length-btn" data-length="long" onclick="selectSequelLength(this, 'long')">
+        <span class="chapters-count">ארוך</span>
+        <small class="length-hint">מסע מלא</small>
       </button>
     </div>
     <button class="create-btn" onclick="confirmSequelBook()">✦ פתח את ספר המשך ✦</button>
@@ -1593,7 +1715,7 @@
 <div id="loading-screen" class="screen">
   <div class="loading-rune">⚙</div>
   <div class="loading-title">פותח ספר חדש...</div>
-  <div class="loading-status" id="loading-status">מגדיר מערכת קסם...</div>
+  <div class="loading-status" id="loading-status">מכין את הספר...</div>
   <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
 </div>
 
@@ -1699,18 +1821,48 @@
 const STORAGE_KEY_V1 = 'sanderson-library-v1';
 const STORAGE_KEY = 'sanderson-library-v2';
 
-const TASTES = {
-  'hard-magic': 'דגש על מערכת קסם מחושבת עם חוקים ברורים, מחיר למימוש קסם, וגילוי הדרגתי של הכללים',
-  'mystery': 'דגש על תעלומות, רמזים, חשדות, וחשיפות הדרגתיות — הקורא צריך לרצות לפתור',
-  'war': 'דגש על סכסוכים, פוליטיקה, מלחמות, בריתות ובגידות — אסקלציה של הימור',
-  'character': 'דגש על דמויות, יחסים, קונפליקטים רגשיים, וצמיחה אישית'
+const GENRES = {
+  fantasy: { label: 'פנטזיה אפית', blueprint: 'עולם מדומיין, מערכת כוח/קסם עם כללים, מסע גיבור' },
+  scifi: { label: 'מדע בדיוני', blueprint: 'הגדרות טכנולוגיה/עתיד, השלכות חברתיות, תהיות מדעיות' },
+  mystery: { label: 'מתח ובלשים', blueprint: 'זירה מוגדרת, רמזים, חשדות, חשיפה הדרגתית — לא עולם פנטזיה' },
+  horror: { label: 'אימה ומסתורין', blueprint: 'מתח אטמוספרי, איום הולך וגובר, חוקי עולם מעצבים פחד' },
+  romance: { label: 'רומן ודרמה', blueprint: 'קשת רגשית, דמויות ויחסים, קונפליקט פנימי וחיצוני' },
+  historical: { label: 'היסטורי ואקשן', blueprint: 'תקופה ומקום, פוליטיקה, קונפליקטים מוסדיים, אקשן' }
 };
+const TONES = {
+  grimdark: 'אפל ובוגר — מורכבות מוסרית, השלכות, אווירה כבדה',
+  classic: 'קלאסי וסוחף — הרפתקה ברורה, קצב מאוזן, מתאים לכל הגילאים',
+  action: 'קצבי ומלא אקשן — משפטים קצרים, מתח גבוה, מעברים מהירים',
+  humor: 'קליל והומוריסטי — שנון, אירוניה, קריצה — בלי לשבור את העלילה',
+  philosophical: 'פילוסופי ועמוק — מונולוגים פנימיים, תיאור עשיר, שכבות משמעות'
+};
+const AUTHORS = {
+  sanderson: 'מבנה הדוק, מערכות כוח ברורות, תכנון עלילה — לא חיקוי',
+  martin: 'פוליטיקה, נקודות מבט מרובות, הימור גבוה, גוון מבוגר',
+  rowling: 'עולם משודר, דמויות חמות, גילוי הדרגתי — לא חיקוי',
+  christie: 'רמזים הוגנים, חשדות, פתרון מסודר — מתח בלשי',
+  dick: 'מציאות מעוותת, פרפרנויה, שאלות זהות — מדע בדיוני פסיכולוגי'
+};
+const BOOK_REFS = {
+  lotr: 'אפיק, מסע, עומק עולם — לא חיקוי דמויות או עלילה',
+  harry: 'מסע צעיר, בית ספר/חינוך, קסם נגיש — לא חיקוי',
+  thrones: 'פוליטיקה, בגידות, נקודות מבט — לא חיקוי',
+  dune: 'פוליטיקה, אקולוגיה, מסחר בכוח — לא חיקוי',
+  sherlock: 'בלש חד, רמזים, לוגיקה — לא חיקוי'
+};
+const LENGTH_PRESETS = {
+  short: { chapters: 15, label: 'קצר' },
+  medium: { chapters: 30, label: 'בינוני' },
+  long: { chapters: 50, label: 'ארוך' }
+};
+
+let welcomeDraft = defaultBookProfile();
+let readingLengthKey = 'short';
 
 let app = { apiKey: '', currentBookId: null, books: {}, readingPrefs: { fontScale: 1, theme: 'dark', immersive: false } };
 let state = createEmptyBookState();
-let selectedTaste = 'hard-magic';
 let pendingSequelSourceId = null;
-let pendingSequelLength = 15;
+let pendingSequelLengthKey = 'short';
 let deferredInstallPrompt = null;
 let waitingSwWorker = null;
 let wakeLock = null;
@@ -1720,16 +1872,190 @@ const chapterGenQueue = [];
 let chapterGenPumpActive = false;
 
 const DEFAULT_TASTE_PROFILES = [
-  { id: 'epic', name: 'אפי ארוך', taste: 'war', length: 50 },
-  { id: 'classic', name: 'קלאסי', taste: 'hard-magic', length: 30 },
-  { id: 'mystery', name: 'מסתורין', taste: 'mystery', length: 30 },
-  { id: 'quick', name: 'קריאה מהירה', taste: 'character', length: 15 }
+  { id: 'epic', name: 'אפי ארוך', genre: 'fantasy', tone: 'classic', lengthKey: 'long' },
+  { id: 'classic', name: 'קלאסי', genre: 'fantasy', tone: 'classic', lengthKey: 'medium' },
+  { id: 'mystery', name: 'מסתורין', genre: 'mystery', tone: 'action', lengthKey: 'medium' },
+  { id: 'quick', name: 'קריאה מהירה', genre: 'romance', tone: 'humor', lengthKey: 'short' }
 ];
+
+function defaultBookProfile() {
+  return { genre: '', genreCustom: '', tone: '', toneCustom: '', author: '', authorCustom: '', bookRef: '', bookRefCustom: '', hook: '' };
+}
+
+function migrateLegacyTaste(taste) {
+  const map = {
+    'hard-magic': { genre: 'fantasy', tone: 'classic' },
+    mystery: { genre: 'mystery', tone: 'classic' },
+    war: { genre: 'historical', tone: 'action' },
+    character: { genre: 'romance', tone: 'philosophical' }
+  };
+  return { ...defaultBookProfile(), ...(map[taste] || { genre: 'fantasy', tone: 'classic' }) };
+}
+
+function getBookProfile(snap) {
+  const s = snap || state;
+  if (s.bookProfile && (s.bookProfile.genre || s.bookProfile.tone || s.bookProfile.hook || s.bookProfile.author || s.bookProfile.bookRef)) {
+    return { ...defaultBookProfile(), ...s.bookProfile };
+  }
+  if (s.taste) return migrateLegacyTaste(s.taste);
+  return defaultBookProfile();
+}
+
+function genreDisplayLabel(profile) {
+  const p = profile || getBookProfile();
+  if (p.genre === 'other' && p.genreCustom?.trim()) return p.genreCustom.trim();
+  return GENRES[p.genre]?.label || p.genre || 'ספרות בדיונית';
+}
+
+function normalizeBlueprint(book) {
+  if (!book) return book;
+  const out = { ...book };
+  if (!out.setting && out.world) out.setting = out.world;
+  if (!out.coreRules && out.magicSystem) out.coreRules = out.magicSystem;
+  if (!out.world && out.setting) out.world = out.setting;
+  if (!out.magicSystem && out.coreRules) out.magicSystem = out.coreRules;
+  return out;
+}
+
+function buildCreativeBrief(profile) {
+  const p = profile || getBookProfile();
+  const parts = [];
+  if (p.hook?.trim()) parts.push(`**רעיון המשתמש (עדיפות עליונה):** ${p.hook.trim()}`);
+  if (p.bookRef) {
+    const ref = p.bookRef === 'other' ? p.bookRefCustom?.trim() : BOOK_REFS[p.bookRef];
+    if (ref) parts.push(`**השראה מספר:** ${ref}`);
+  }
+  if (p.author) {
+    const auth = p.author === 'other' ? p.authorCustom?.trim() : AUTHORS[p.author];
+    if (auth) parts.push(`**השראה מסופר:** ${auth}`);
+  }
+  if (p.tone) {
+    const tone = p.tone === 'other' ? p.toneCustom?.trim() : TONES[p.tone];
+    if (tone) parts.push(`**טון ואווירה:** ${tone}`);
+  }
+  if (p.genre) {
+    const g = p.genre === 'other' ? p.genreCustom?.trim() : (GENRES[p.genre]?.blueprint || GENRES[p.genre]?.label);
+    if (g) parts.push(`**ז'אנר:** ${g}`);
+  }
+  return parts.join('\n') || "ספר ספרותי בעברית — בחר את הז'אנר והטון לפי שיקולך.";
+}
+
+function buildStyleInstructions(profile) {
+  const p = profile || getBookProfile();
+  const lines = ['כתוב בעברית ספרותית, סוחפת, עם דיאלוג חי ותיאור ממוקד.'];
+  if (p.author && p.author !== 'other' && AUTHORS[p.author]) {
+    lines.push(`מבנה וקצב בהשראת: ${AUTHORS[p.author]} — לא חיקוי סגנון או דמויות.`);
+  } else if (p.author === 'other' && p.authorCustom?.trim()) {
+    lines.push(`השראה מסופר: ${p.authorCustom.trim()} — לא חיקוי.`);
+  }
+  if (p.tone && p.tone !== 'other' && TONES[p.tone]) lines.push(`טון: ${TONES[p.tone]}.`);
+  else if (p.tone === 'other' && p.toneCustom?.trim()) lines.push(`טון: ${p.toneCustom.trim()}.`);
+  if (p.genre && p.genre !== 'other' && GENRES[p.genre]) {
+    lines.push(`ז'אנר: ${GENRES[p.genre].label} — ${GENRES[p.genre].blueprint}.`);
+  }
+  lines.push('אל תחזור על פסקאות שכבר נכתבו. סיים תמיד במשפט שלם.');
+  return lines.join('\n');
+}
+
+function isSoftSequelGenre(profile) {
+  const g = (profile || getBookProfile()).genre;
+  return g === 'mystery' || g === 'horror';
+}
+
+function selectChoice(btn) {
+  const group = btn.dataset.group;
+  const value = btn.dataset.value;
+  const container = btn.closest('.choice-tiles');
+  if (!container || !group) return;
+  const wasSelected = btn.classList.contains('selected');
+  container.querySelectorAll('.choice-tile').forEach(b => b.classList.remove('selected'));
+  if (!wasSelected) {
+    btn.classList.add('selected');
+    welcomeDraft[group] = value;
+  } else {
+    welcomeDraft[group] = '';
+  }
+  const customId = { genre: 'genre-custom', tone: 'tone-custom', author: 'author-custom', bookRef: 'bookref-custom' }[group];
+  const customEl = customId ? document.getElementById(customId) : null;
+  if (customEl) customEl.style.display = welcomeDraft[group] === 'other' ? 'block' : 'none';
+}
+
+function collectWelcomeProfile() {
+  const hook = document.getElementById('hook-input')?.value?.trim() || '';
+  const genreCustom = document.getElementById('genre-custom')?.value?.trim() || '';
+  const toneCustom = document.getElementById('tone-custom')?.value?.trim() || '';
+  const authorCustom = document.getElementById('author-custom')?.value?.trim() || '';
+  const bookRefCustom = document.getElementById('bookref-custom')?.value?.trim() || '';
+  return {
+    ...defaultBookProfile(),
+    ...welcomeDraft,
+    hook,
+    genreCustom,
+    toneCustom,
+    authorCustom,
+    bookRefCustom
+  };
+}
+
+function validateWelcomeSelections(profile) {
+  const p = profile || collectWelcomeProfile();
+  const hasGenre = !!(p.genre && (p.genre !== 'other' || p.genreCustom?.trim()));
+  const hasTone = !!(p.tone && (p.tone !== 'other' || p.toneCustom?.trim()));
+  const hasAuthor = !!(p.author && (p.author !== 'other' || p.authorCustom?.trim()));
+  const hasBookRef = !!(p.bookRef && (p.bookRef !== 'other' || p.bookRefCustom?.trim()));
+  const hasHook = !!p.hook?.trim();
+  return hasGenre || hasTone || hasAuthor || hasBookRef || hasHook;
+}
+
+function syncWelcomeUIFromProfile(profile, lengthKey) {
+  const p = profile || defaultBookProfile();
+  welcomeDraft = { ...defaultBookProfile(), ...p };
+  document.getElementById('hook-input').value = p.hook || '';
+  ['genre', 'tone', 'author', 'bookRef'].forEach(group => {
+    const val = p[group];
+    const tiles = document.querySelectorAll(`#welcome-screen .choice-tile[data-group="${group}"]`);
+    tiles.forEach(b => b.classList.toggle('selected', b.dataset.value === val));
+    const customId = { genre: 'genre-custom', tone: 'tone-custom', author: 'author-custom', bookRef: 'bookref-custom' }[group];
+    const customEl = document.getElementById(customId);
+    if (customEl) {
+      customEl.value = p[group + 'Custom'] || '';
+      customEl.style.display = val === 'other' ? 'block' : 'none';
+    }
+  });
+  const lk = lengthKey || readingLengthKey || 'short';
+  readingLengthKey = lk;
+  document.querySelectorAll('#length-presets .length-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.length === lk);
+  });
+}
+
+function selectReadingLength(btn, key) {
+  readingLengthKey = key;
+  document.querySelectorAll('#length-presets .length-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.totalChapters = LENGTH_PRESETS[key]?.chapters || 15;
+  app.readingPrefs.defaultLengthKey = key;
+  save();
+}
+
+function migrateBooksInApp() {
+  Object.keys(app.books || {}).forEach(id => {
+    const b = app.books[id];
+    if (!b.bookProfile) b.bookProfile = migrateLegacyTaste(b.taste);
+    if (!b.readingLengthKey) {
+      const t = b.totalChapters || 15;
+      b.readingLengthKey = t >= 45 ? 'long' : t >= 25 ? 'medium' : 'short';
+    }
+    if (b.memoryBook) b.memoryBook = migrateMemoryBook(b.memoryBook);
+    if (b.book) b.book = normalizeBlueprint(b.book);
+  });
+}
 
 function createEmptyBookState() {
   return {
     id: null,
-    taste: 'hard-magic',
+    bookProfile: defaultBookProfile(),
+    readingLengthKey: 'short',
     apiKey: '',
     totalChapters: 15,
     book: null,
@@ -1758,7 +2084,8 @@ function newBookId() {
 function bookSnapshot() {
   return {
     id: state.id,
-    taste: state.taste,
+    bookProfile: state.bookProfile || defaultBookProfile(),
+    readingLengthKey: state.readingLengthKey || 'short',
     totalChapters: state.totalChapters,
     book: state.book,
     chapters: state.chapters,
@@ -1997,7 +2324,7 @@ function renderLibraryActions() {
   if (isBookComplete()) {
     const sequelBtn = document.createElement('button');
     sequelBtn.className = 'secondary-btn';
-    sequelBtn.textContent = '🌍 המשך בעולם הזה';
+    sequelBtn.textContent = '🌍 עוד סיפור באותו עולם';
     sequelBtn.onclick = () => promptSequelBook();
     el.appendChild(sequelBtn);
   }
@@ -2005,6 +2332,15 @@ function renderLibraryActions() {
 
 function applyBookSnapshot(snap) {
   state = { ...createEmptyBookState(), ...snap, apiKey: app.apiKey, writing: false, generatingIdx: null };
+  if (!state.bookProfile || (!state.bookProfile.genre && !state.bookProfile.hook && state.taste)) {
+    state.bookProfile = migrateLegacyTaste(state.taste);
+  }
+  if (state.readingLengthKey && LENGTH_PRESETS[state.readingLengthKey]) {
+    state.totalChapters = LENGTH_PRESETS[state.readingLengthKey].chapters;
+  } else if (!state.totalChapters) {
+    state.totalChapters = LENGTH_PRESETS.short.chapters;
+  }
+  if (state.book) state.book = normalizeBlueprint(state.book);
   ensureMemoryBook();
 }
 
@@ -2028,10 +2364,13 @@ function load() {
         if (old.book) {
           const id = newBookId();
           old.id = id;
-          old.taste = old.taste || 'hard-magic';
+          const taste = old.taste || 'hard-magic';
           old.storySynopsis = old.storySynopsis || '';
           app.books[id] = {
-            id, taste: old.taste, totalChapters: old.totalChapters,
+            id,
+            bookProfile: migrateLegacyTaste(taste),
+            readingLengthKey: (old.totalChapters || 15) >= 45 ? 'long' : (old.totalChapters || 15) >= 25 ? 'medium' : 'short',
+            totalChapters: old.totalChapters,
             book: old.book, chapters: old.chapters || [], eventLog: old.eventLog || [],
             storySynopsis: old.storySynopsis, memoryBook: old.memoryBook,
             lastReadChapter: old.lastReadChapter || 0, createdAt: Date.now()
@@ -2045,6 +2384,7 @@ function load() {
       if (!app.books) app.books = {};
       if (!app.readingPrefs) app.readingPrefs = { fontScale: 1, theme: 'dark', immersive: false };
       if (!app.tasteProfiles?.length) app.tasteProfiles = DEFAULT_TASTE_PROFILES.map(p => ({ ...p }));
+      migrateBooksInApp();
     }
     const ids = Object.keys(app.books);
     if (app.currentBookId && app.books[app.currentBookId]) {
@@ -2080,7 +2420,7 @@ function getStoryContextForPrompt() {
 async function maybeCompressStorySynopsis() {
   const n = state.chapters.length;
   if (n < 5 || n % 5 !== 0) return;
-  const prompt = `סכם את עלילת ספר הפנטזיה עד כה ב-14-18 משפטים בעברית.
+  const prompt = `סכם את עלילת הספר עד כה ב-14-18 משפטים בעברית.
 כלול: דמויות מרכזיות, קונפליקט, מטרות, תעלומות פתוחות, ומצב אחרון.
 כתוב בנקודות קצרות. ללא הקדמה.
 
@@ -2175,10 +2515,11 @@ function renderTasteProfiles() {
   const active = app.readingPrefs?.activeProfile || 'classic';
   wrap.innerHTML = '';
   getTasteProfiles().forEach(p => {
+    const lenLabel = LENGTH_PRESETS[p.lengthKey || 'medium']?.label || 'בינוני';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'profile-btn' + (p.id === active ? ' selected' : '');
-    btn.textContent = `${p.name} · ${p.length} פרקים`;
+    btn.textContent = `${p.name} · ${lenLabel}`;
     btn.onclick = () => applyTasteProfile(p.id);
     wrap.appendChild(btn);
   });
@@ -2188,26 +2529,18 @@ function applyTasteProfile(profileId) {
   const p = getTasteProfiles().find(x => x.id === profileId);
   if (!p) return;
   app.readingPrefs.activeProfile = profileId;
-  app.readingPrefs.defaultTaste = p.taste;
-  app.readingPrefs.defaultLength = p.length;
-  selectedTaste = p.taste;
-  state.totalChapters = p.length;
-  document.querySelectorAll('#taste-options .taste-btn').forEach(b => {
-    b.classList.toggle('selected', b.dataset.taste === p.taste);
-  });
-  document.querySelectorAll('#welcome-screen .length-btn').forEach(b => {
-    const n = parseInt(b.querySelector('.chapters-count')?.textContent, 10);
-    b.classList.toggle('selected', n === p.length);
-  });
+  const legacy = p.taste ? migrateLegacyTaste(p.taste) : null;
+  const profile = {
+    ...defaultBookProfile(),
+    genre: p.genre || legacy?.genre || 'fantasy',
+    tone: p.tone || legacy?.tone || 'classic'
+  };
+  const lk = p.lengthKey || (p.length >= 45 ? 'long' : p.length >= 25 ? 'medium' : 'short');
+  app.readingPrefs.defaultLengthKey = lk;
+  readingLengthKey = lk;
+  state.totalChapters = LENGTH_PRESETS[lk]?.chapters || 30;
+  syncWelcomeUIFromProfile(profile, lk);
   renderTasteProfiles();
-  save();
-}
-
-function selectTaste(btn, taste) {
-  document.querySelectorAll('#taste-options .taste-btn').forEach(b => b.classList.remove('selected'));
-  btn.classList.add('selected');
-  selectedTaste = taste;
-  app.readingPrefs.defaultTaste = taste;
   save();
 }
 
@@ -2360,8 +2693,6 @@ function shelfCount() {
   return Object.keys(app.books || {}).length;
 }
 
-const TASTE_LABELS = { 'hard-magic': 'קסם קשה', mystery: 'מסתורין', war: 'מלחמה', character: 'דמויות' };
-
 function renderShelf() {
   const grid = document.getElementById('shelf-grid');
   if (!grid) return;
@@ -2400,7 +2731,7 @@ function renderShelf() {
           <span class="meta-pill">${written}/${total} · ${pct}%</span>
           ${isBookComplete(b) ? '<span class="meta-pill meta-done">הושלם</span>' : written ? '<span class="meta-pill">בתהליך</span>' : '<span class="meta-pill">חדש</span>'}
           ${(b.sequelIndex || 1) > 1 || b.parentBookId ? `<span class="meta-pill meta-series">סדרה ${b.sequelIndex || 1}</span>` : ''}
-          <span class="meta-pill">${TASTE_LABELS[b.taste] || 'פנטזיה'}</span>
+          <span class="meta-pill">${escapeHtml(genreDisplayLabel(getBookProfile(b)))}</span>
           ${stars ? `<span class="meta-pill">${stars}</span>` : ''}
         </div>
         ${canContinue ? `<div style="font-size:0.78rem;color:var(--gold);margin-top:0.35rem">↪ המשך מפרק ${continueIdx + 1}</div>` : ''}
@@ -2461,11 +2792,14 @@ function updateWelcomeShelfLink() {
 }
 
 function startRandomBook() {
-  const keys = Object.keys(TASTES);
-  selectedTaste = keys[Math.floor(Math.random() * keys.length)];
-  document.querySelectorAll('.taste-btn').forEach(b => {
-    b.classList.toggle('selected', b.dataset.taste === selectedTaste);
-  });
+  const genreKeys = Object.keys(GENRES);
+  const toneKeys = Object.keys(TONES);
+  const profile = {
+    ...defaultBookProfile(),
+    genre: genreKeys[Math.floor(Math.random() * genreKeys.length)],
+    tone: toneKeys[Math.floor(Math.random() * toneKeys.length)]
+  };
+  syncWelcomeUIFromProfile(profile, readingLengthKey);
   startBookCreation();
 }
 
@@ -2563,27 +2897,51 @@ function parseJsonFromResponse(raw) {
 }
 
 function emptyMemoryBook() {
-  return { characters: [], locations: [], artifacts: [], magicRules: [], openMysteries: [] };
+  return { characters: [], locations: [], keyObjects: [], worldRules: [], openMysteries: [] };
+}
+
+function migrateMemoryBook(mb) {
+  if (!mb) return emptyMemoryBook();
+  const out = { ...emptyMemoryBook(), ...mb };
+  if (!out.worldRules?.length && mb.magicRules?.length) {
+    out.worldRules = mb.magicRules.map(r => ({
+      rule: r.rule,
+      establishedInChapter: r.establishedInChapter,
+      notes: r.notes
+    }));
+  }
+  if (!out.keyObjects?.length && mb.artifacts?.length) {
+    out.keyObjects = mb.artifacts.map(a => ({
+      name: a.name,
+      description: a.description,
+      owner: a.owner,
+      status: a.status
+    }));
+  }
+  return out;
 }
 
 function ensureMemoryBook() {
   if (!state.memoryBook) {
     state.memoryBook = state.book ? initMemoryBookFromBlueprint(state.book) : emptyMemoryBook();
+  } else {
+    state.memoryBook = migrateMemoryBook(state.memoryBook);
   }
 }
 
 function initMemoryBookFromBlueprint(book) {
+  const b = normalizeBlueprint(book);
   return {
-    characters: (book.mainCharacters || []).map(c => ({
+    characters: (b.mainCharacters || []).map(c => ({
       name: c.name,
       role: c.role || '',
       status: 'פעיל',
       notes: c.trait || ''
     })),
-    locations: book.world ? [{ name: 'עולם', description: book.world, significance: 'בסיס' }] : [],
-    artifacts: [],
-    magicRules: book.magicSystem
-      ? [{ rule: book.magicSystem, establishedInChapter: 0, notes: 'מערכת קסם ראשית' }]
+    locations: b.setting ? [{ name: 'הגדרה', description: b.setting, significance: 'בסיס' }] : [],
+    keyObjects: [],
+    worldRules: b.coreRules
+      ? [{ rule: b.coreRules, establishedInChapter: 0, notes: 'כללי עולם' }]
       : [],
     openMysteries: []
   };
@@ -2593,6 +2951,8 @@ function formatMemoryBookForPrompt() {
   ensureMemoryBook();
   const mb = state.memoryBook;
   const fmt = (arr, lineFn) => (arr?.length ? arr.map(lineFn).join('\n') : '(ריק)');
+  const objects = mb.keyObjects?.length ? mb.keyObjects : mb.artifacts;
+  const rules = mb.worldRules?.length ? mb.worldRules : mb.magicRules;
   return `**ספר הזיכרון (עובדות מוסכמות — חובה לשמור על עקביות):**
 
 דמויות:
@@ -2601,13 +2961,13 @@ ${fmt(mb.characters, c => `- ${c.name} (${c.role}): ${c.status}. ${c.notes || ''
 מקומות:
 ${fmt(mb.locations, l => `- ${l.name}: ${l.description}. ${l.significance || ''}`)}
 
-חפצים:
-${fmt(mb.artifacts, a => `- ${a.name}: ${a.description}. בעלים: ${a.owner || '?'}. ${a.status || ''}`)}
+חפצים ואובייקטים מרכזיים:
+${fmt(objects, a => `- ${a.name}: ${a.description}. בעלים: ${a.owner || '?'}. ${a.status || ''}`)}
 
-כללי קסם:
-${fmt(mb.magicRules, r => `- ${r.rule} (מוכר מפרק ${r.establishedInChapter || 0}). ${r.notes || ''}`)}
+כללי עולם:
+${fmt(rules, r => `- ${r.rule} (מוכר מפרק ${r.establishedInChapter || 0}). ${r.notes || ''}`)}
 
-תעלומות פתוחות:
+תעלומות ושאלות פתוחות:
 ${fmt(mb.openMysteries, m => `- ${m.question} [${m.status || 'פתוח'}, מפרק ${m.introducedChapter || '?'}]. רמזים: ${m.clues || ''}`)}`;
 }
 
@@ -2629,36 +2989,16 @@ function showLibrary() {
   showScreen('library-screen');
 }
 
-// ===== LENGTH SELECTION =====
-function selectLength(btn, n) {
-  const scope = btn.closest('#welcome-screen') || btn.closest('#sequel-screen');
-  if (scope) scope.querySelectorAll('.length-btn').forEach(b => b.classList.remove('selected'));
-  else document.querySelectorAll('.length-btn').forEach(b => b.classList.remove('selected'));
-  btn.classList.add('selected');
-  state.totalChapters = n;
-  if (btn.closest('#welcome-screen')) {
-    app.readingPrefs.defaultLength = n;
-    save();
-  }
-}
-
 function applyWelcomeDefaults() {
   const p = app.readingPrefs || {};
   if (p.activeProfile) applyTasteProfile(p.activeProfile);
   else {
-    if (p.defaultTaste) {
-      selectedTaste = p.defaultTaste;
-      document.querySelectorAll('#taste-options .taste-btn').forEach(b => {
-        b.classList.toggle('selected', b.dataset.taste === p.defaultTaste);
-      });
-    }
-    const len = p.defaultLength || 15;
-    state.totalChapters = len;
-    document.querySelectorAll('#welcome-screen .length-btn').forEach(b => {
-      const n = parseInt(b.querySelector('.chapters-count')?.textContent, 10);
-      b.classList.toggle('selected', n === len);
-    });
+    const lk = p.defaultLengthKey || 'short';
+    readingLengthKey = lk;
+    state.totalChapters = LENGTH_PRESETS[lk]?.chapters || 15;
+    syncWelcomeUIFromProfile(defaultBookProfile(), lk);
   }
+  document.querySelectorAll('.optional-input').forEach(el => { el.style.display = 'none'; });
 }
 
 // ===== API CALL =====
@@ -2759,10 +3099,18 @@ async function startBookCreation() {
     return;
   }
 
+  const profile = collectWelcomeProfile();
+  if (!validateWelcomeSelections(profile)) {
+    showError('welcome-error', 'בחר לפחות אחד: ז\'אנר, טון, סופר, ספר, או רעיון חופשי.');
+    return;
+  }
+
   state.apiKey = apiKey;
   app.apiKey = apiKey;
   state.id = newBookId();
-  state.taste = selectedTaste;
+  state.bookProfile = profile;
+  state.readingLengthKey = readingLengthKey;
+  state.totalChapters = LENGTH_PRESETS[readingLengthKey]?.chapters || 15;
   state.createdAt = Date.now();
   app.currentBookId = state.id;
   document.getElementById('create-btn').disabled = true;
@@ -2771,7 +3119,7 @@ async function startBookCreation() {
 
   const statuses = [
     'בוחר את שולחן הכתיבה...',
-    'מכין את העולם...',
+    'מכין את ההגדרה...',
     'מייצר דמויות...',
     'מתכנן את העלילה...',
     'מסדר את תוכן העניינים...'
@@ -2784,7 +3132,7 @@ async function startBookCreation() {
   }, 2000);
 
   try {
-    const bookData = await createBookBlueprint();
+    const bookData = normalizeBlueprint(await createBookBlueprint());
     state.book = bookData;
     state.chapters = [];
     state.eventLog = [];
@@ -2809,18 +3157,22 @@ async function startBookCreation() {
 
 async function createBookBlueprint() {
   const n = state.totalChapters;
-  const tasteHint = TASTES[state.taste] || TASTES['hard-magic'];
+  const brief = buildCreativeBrief(getBookProfile());
+  const genreLabel = genreDisplayLabel(getBookProfile());
 
-  const prompt = `צור תוכנית לספר פנטזיה אפי בעברית בסגנון ברנדון סנדרסון עם ${n} פרקים.
-טעם הספר: ${tasteHint}
+  const prompt = `צור תוכנית לספר בעברית עם ${n} פרקים.
+
+${brief}
 
 החזר JSON בלבד, ללא markdown, ללא הסברים:
 {
   "title": "שם הספר",
   "tagline": "משפט תיאור קצר",
-  "genre": "פנטזיה אפית",
-  "world": "תיאור עולם קצר (2 משפטים בלבד)",
-  "magicSystem": "תיאור מערכת קסם קצר (משפט אחד)",
+  "genre": "${genreLabel}",
+  "setting": "הגדרת עולם/זירה (2 משפטים)",
+  "coreRules": "כללי עולם, טכנולוגיה, או מערכת כוח — משפט אחד (רלוונטי לז'אנר)",
+  "centralConflict": "קונפליקט מרכזי במשפט",
+  "theme": "נושא מרכזי",
   "mainCharacters": [
     {"name": "שם", "role": "תפקיד", "trait": "תכונה"}
   ],
@@ -2830,10 +3182,11 @@ async function createBookBlueprint() {
 }
 
 כללים קריטיים:
-- chapterOutlines חייב להכיל בדיוק ${n} פרקים
-- summary של כל פרק: משפט אחד קצר בלבד
-- mainCharacters: 3 דמויות בלבד
-- JSON בלבד, ללא שום טקסט נוסף`;
+- chapterOutlines: בדיוק ${n} פרקים
+- summary: משפט אחד קצר לכל פרק
+- mainCharacters: 3 דמויות
+- התאם לז'אנר — לא כופה פנטזיה אם לא נבחר
+- JSON בלבד`;
 
   const raw = await callGemini(prompt, '', 6000);
 
@@ -2872,19 +3225,27 @@ async function createBookBlueprint() {
 
 async function createSequelBlueprint(parent) {
   const n = state.totalChapters;
-  const tasteHint = TASTES[state.taste] || TASTES['hard-magic'];
-  const memoryJson = JSON.stringify(parent.memoryBook || {}, null, 2).slice(0, 6000);
+  const pb = normalizeBlueprint(parent.book);
+  const profile = getBookProfile(parent);
+  const soft = isSoftSequelGenre(profile);
+  const memoryJson = JSON.stringify(migrateMemoryBook(parent.memoryBook || {}), null, 2).slice(0, 6000);
   const synopsis = (parent.storySynopsis || parent.eventLog?.slice(-5).join('\n') || '').slice(0, 4000);
   const lastChapter = parent.chapters[parent.chapters.length - 1];
   const ending = lastChapter?.text?.slice(-1500) || '';
+  const sequelMode = soft
+    ? 'ספר חדש באותו עולם ודמויות — עלילה חדשה, תעלומה או קונפליקט חדש. אל תפתור מחדש את העלילה הקודמת.'
+    : 'המשך ישיר של העלילה — לא רימייק.';
 
-  const prompt = `צור תוכנית לספר המשך (ספר ${state.sequelIndex} בסדרה) באותו עולם — פנטזיה אפית בעברית בסגנון ברנדון סנדרסון, ${n} פרקים.
+  const prompt = `צור תוכנית לספר המשך (ספר ${state.sequelIndex} בסדרה) בעברית, ${n} פרקים.
+${sequelMode}
 
-**ספר קודם:** ${parent.book.title}
-**תגית:** ${parent.book.tagline || ''}
-**עולם:** ${parent.book.world || ''}
-**קסם:** ${parent.book.magicSystem || ''}
-**טעם:** ${tasteHint}
+**ספר קודם:** ${pb.title}
+**תגית:** ${pb.tagline || ''}
+**הגדרה:** ${pb.setting || pb.world || ''}
+**כללי עולם:** ${pb.coreRules || pb.magicSystem || ''}
+**קונפליקט קודם (הושלם):** ${pb.centralConflict || '—'}
+
+${buildCreativeBrief(profile)}
 
 **סיכום העלילה עד כה:**
 ${synopsis}
@@ -2899,17 +3260,18 @@ ${memoryJson}
 {
   "title": "שם הספר החדש (לא אותו שם)",
   "tagline": "משפט תיאור",
-  "genre": "פנטזיה אפית",
-  "world": "אותו עולם בקצרה",
-  "magicSystem": "מערכת הקסם (עקבית עם הקודם)",
+  "genre": "${genreDisplayLabel(profile)}",
+  "setting": "אותה זירה/עולם בקצרה",
+  "coreRules": "כללי עולם עקביים",
+  "centralConflict": "קונפליקט חדש${soft ? ' — עלילה עצמאית' : ''}",
+  "theme": "נושא",
   "mainCharacters": [{"name": "שם", "role": "תפקיד", "trait": "תכונה"}],
   "chapterOutlines": [{"number": 1, "title": "שם", "summary": "משפט אחד", "pov": "שם דמות"}]
 }
 
 כללים:
-- זה המשך ישיר — לא רימייק
-- chapterOutlines: בדיוק ${n} פרקים, summary משפט אחד
-- mainCharacters: 3 דמויות (יכולות לכלול דמויות מהספר הקודם)
+- chapterOutlines: בדיוק ${n} פרקים
+- mainCharacters: 3 דמויות
 - JSON בלבד`;
 
   const raw = await callGemini(prompt, '', 6000);
@@ -2953,17 +3315,20 @@ function promptSequelBook(sourceId) {
   }
 
   pendingSequelSourceId = parent.id;
-  pendingSequelLength = 15;
+  pendingSequelLengthKey = parent.readingLengthKey || 'short';
 
   const info = document.getElementById('sequel-parent-info');
   if (info) {
     const series = parent.seriesTitle || parent.book.title;
     const num = parent.sequelIndex || 1;
-    info.textContent = `ממשיך את «${series}» (אחרי «${parent.book.title}») — זה יהיה ספר ${num + 1} בסדרה.`;
+    const soft = isSoftSequelGenre(getBookProfile(parent));
+    info.textContent = soft
+      ? `עוד סיפור באותו עולם אחרי «${parent.book.title}» — ספר ${num + 1} בסדרה «${series}».`
+      : `ממשיך את «${series}» (אחרי «${parent.book.title}») — ספר ${num + 1} בסדרה.`;
   }
 
   document.querySelectorAll('#sequel-length-options .length-btn').forEach(b => {
-    b.classList.toggle('selected', Number(b.dataset.length) === 15);
+    b.classList.toggle('selected', b.dataset.length === pendingSequelLengthKey);
   });
   const err = document.getElementById('sequel-error');
   if (err) err.style.display = 'none';
@@ -2971,10 +3336,10 @@ function promptSequelBook(sourceId) {
   showScreen('sequel-screen');
 }
 
-function selectSequelLength(btn, n) {
+function selectSequelLength(btn, key) {
   document.querySelectorAll('#sequel-length-options .length-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
-  pendingSequelLength = n;
+  pendingSequelLengthKey = key;
 }
 
 function cancelSequelSetup() {
@@ -2990,10 +3355,10 @@ async function confirmSequelBook() {
   }
   const err = document.getElementById('sequel-error');
   if (err) err.style.display = 'none';
-  await startSequelBook(pendingSequelSourceId, pendingSequelLength);
+  await startSequelBook(pendingSequelSourceId, pendingSequelLengthKey);
 }
 
-async function startSequelBook(sourceId, chapterCount) {
+async function startSequelBook(sourceId, lengthKey) {
   const parent = app.books[sourceId] || bookSnapshot();
   if (!parent?.book || !isBookComplete(parent)) {
     showError('sequel-error', 'לא ניתן לפתוח המשך — הספר הקודם לא הושלם');
@@ -3013,8 +3378,10 @@ async function startSequelBook(sourceId, chapterCount) {
   state = createEmptyBookState();
   state.id = newBookId();
   state.apiKey = apiKey;
-  state.taste = parent.taste || selectedTaste;
-  state.totalChapters = chapterCount || pendingSequelLength || 15;
+  state.bookProfile = getBookProfile(parent);
+  const lk = lengthKey || pendingSequelLengthKey || 'short';
+  state.readingLengthKey = lk;
+  state.totalChapters = LENGTH_PRESETS[lk]?.chapters || 15;
   pendingSequelSourceId = null;
   state.parentBookId = parent.id;
   state.seriesTitle = parent.seriesTitle || parent.book.title;
@@ -3031,7 +3398,7 @@ async function startSequelBook(sourceId, chapterCount) {
   document.getElementById('loading-status').textContent = 'בונה על הסיפור הקודם...';
 
   try {
-    const bookData = await createSequelBlueprint(parent);
+    const bookData = normalizeBlueprint(await createSequelBlueprint(parent));
     state.book = bookData;
     state.memoryBook = parentMem;
     app.books[state.id] = bookSnapshot();
@@ -3267,7 +3634,7 @@ async function planChapter(idx) {
   "povFocus": "מה נקודת המבט חייבת להדגיש",
   "mysteryHooks": ["תעלומות/שאלות לפתח או להזכיר"],
   "continuityMust": ["עובדות שחייבות להופיע או להישמר"],
-  "magicUse": "איך הקסם מופיע בפרק"
+  "worldRulesUse": "איך כללי העולם/המערכת מופיעים בפרק"
 }
 
 **ספר:** ${book.title}
@@ -3289,7 +3656,7 @@ ${priorContext}
       povFocus: outline.pov,
       mysteryHooks: [],
       continuityMust: [],
-      magicUse: book.magicSystem || ''
+      worldRulesUse: book.coreRules || book.magicSystem || ''
     };
   }
   return plan;
@@ -3304,7 +3671,7 @@ async function reviewChapter(text, idx, plan) {
 {
   "approved": true/false,
   "score": 1-10,
-  "issues": [{"type": "דמות|מקום|קסם|תעלומה|עלילה|סגנון", "description": "בעיה", "severity": "גבוה|בינוני|נמוך"}]
+  "issues": [{"type": "דמות|מקום|עולם|תעלומה|עלילה|סגנון", "description": "בעיה", "severity": "גבוה|בינוני|נמוך"}]
 }
 
 **פרק ${outline.number}:** ${outline.title}
@@ -3349,7 +3716,9 @@ async function fixChapter(text, review, idx, plan) {
     .map((i, n) => `${n + 1}. [${i.type}/${i.severity}] ${i.description}`)
     .join('\n');
 
-  const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך מלא (לפחות 1200 מילים), סגנון סנדרסוני, ומעברי [***].
+  const style = buildStyleInstructions(getBookProfile());
+  const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך מלא (לפחות 1200 מילים) ומעברי [***].
+${style}
 אם הפרק נקטע — השלם אותו עד סיום מלא עם hook. סיים תמיד במשפט שלם.
 אל תשנה אירועים שלא קשורים לתיקון. החזר את הפרק המלא בלבד — ללא כותרת, ללא הסברים.
 
@@ -3385,8 +3754,8 @@ ${chapterText.substring(0, 6000)}
 {
   "characters": [{"name":"","role":"","status":"","notes":""}],
   "locations": [{"name":"","description":"","significance":""}],
-  "artifacts": [{"name":"","description":"","owner":"","status":""}],
-  "magicRules": [{"rule":"","establishedInChapter":0,"notes":""}],
+  "keyObjects": [{"name":"","description":"","owner":"","status":""}],
+  "worldRules": [{"rule":"","establishedInChapter":0,"notes":""}],
   "openMysteries": [{"question":"","introducedChapter":0,"status":"פתוח|נפתר|בתהליך","clues":""}]
 }
 
@@ -3403,7 +3772,7 @@ ${chapterText.substring(0, 6000)}
 
 // ===== SUMMARIZE CHAPTER (event log) =====
 async function summarizeChapter(chapterText, chapterNum, outline) {
-  const prompt = `קרא את הפרק הבא מספר פנטזיה וסכם אותו ב-4-6 משפטים קצרים בעברית.
+  const prompt = `קרא את הפרק הבא וסכם אותו ב-4-6 משפטים קצרים בעברית.
 הסיכום חייב לכלול: אירועים מרכזיים שקרו, החלטות חשובות של דמויות, שינויים במצב העולם, וכל מידע שחיוני להמשך הסיפור.
 כתוב בצורת נקודות: "- [אירוע]". ללא הקדמה, ללא סיכום כללי — רק עובדות.
 
@@ -3439,7 +3808,7 @@ function buildChapterContext(idx, plan) {
 מיקוד POV: ${plan.povFocus || outline.pov}
 חובות עקביות: ${(plan.continuityMust || []).join('; ') || '—'}
 תעלומות: ${(plan.mysteryHooks || []).join('; ') || '—'}
-קסם: ${plan.magicUse || book.magicSystem}`;
+כללי עולם: ${plan.worldRulesUse || plan.magicUse || book.coreRules || book.magicSystem || '—'}`;
 
   return { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext };
 }
@@ -3469,7 +3838,8 @@ async function writeScene(idx, plan, sceneIndex, scene, priorInChapter, ctx, tot
     ? `**מה שכבר קרה בפרק הזה (אל תחזור על זה):**\n"...${priorInChapter.trimEnd().slice(-800)}..."\n\n`
     : '';
 
-  const prompt = `אתה כותב ספר פנטזיה אפי בעברית בסגנון ברנדון סנדרסון.
+  const style = buildStyleInstructions(getBookProfile());
+  const prompt = `${style}
 
 **ספר:** ${book.title} | **פרק ${outline.number}:** ${outline.title} | **POV:** ${outline.pov}
 
@@ -3588,7 +3958,7 @@ function renderLibrary() {
 
   document.getElementById('book-meta').innerHTML =
     `<span>📚 ${total} פרקים</span><span>✨ ${book.genre || 'פנטזיה אפית'}</span>` +
-    `<span>🎭 ${TASTE_LABELS[state.taste] || 'פנטזיה'}</span><span>👁 ${writtenCount} זמינים</span>${seriesBadge}`;
+    `<span>🎭 ${escapeHtml(genreDisplayLabel())}</span><span>👁 ${writtenCount} זמינים</span>${seriesBadge}`;
   document.getElementById('book-tagline').textContent = book.tagline || '';
 
   // Progress
@@ -3821,7 +4191,7 @@ function openChapter(idx) {
       const row = document.createElement('div');
       row.className = 'complete-btn-row';
       row.style.marginTop = '1rem';
-      [['📥 EPUB', () => exportBookEpub()], ['🌍 המשך בעולם', () => promptSequelBook()]]
+      [['📥 EPUB', () => exportBookEpub()], ['🌍 עוד סיפור באותו עולם', () => promptSequelBook()]]
         .forEach(([label, fn]) => {
           const b = document.createElement('button');
           b.type = 'button';
