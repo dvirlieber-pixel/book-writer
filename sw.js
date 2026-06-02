@@ -1,4 +1,4 @@
-const CACHE_NAME = 'seferiyat-hanetzach-v1';
+const CACHE_NAME = 'seferiyat-hanetzach-v2';
 
 const PRECACHE_URLS = [
   './',
