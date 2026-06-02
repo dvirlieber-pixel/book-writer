@@ -9,7 +9,7 @@
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "browser"],
-  "orientation": "any",
+  "orientation": "portrait-primary",
   "background_color": "#1a1410",
   "theme_color": "#1a1410",
   "categories": ["books", "entertainment"],

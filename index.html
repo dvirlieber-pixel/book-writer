@@ -881,14 +881,63 @@
     border-radius: 1px;
     resize: vertical;
   }
-  .inspiration-details { margin: 0.75rem 0; }
-  .inspiration-details summary {
-    cursor: pointer;
-    color: var(--gold-dim);
-    font-size: 0.82rem;
-    list-style: none;
+  .inspiration-panel {
+    margin: 1rem 0;
+    border: 1px solid var(--gold);
+    background: var(--gold-fill-soft);
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.12);
   }
-  .inspiration-details summary::-webkit-details-marker { display: none; }
+  .inspiration-panel-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.85rem 0.9rem;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .inspiration-panel-trigger::-webkit-details-marker { display: none; }
+  .inspiration-panel-icon {
+    font-size: 1.15rem;
+    color: var(--gold);
+    flex-shrink: 0;
+  }
+  .inspiration-panel-text {
+    flex: 1;
+    text-align: right;
+    min-width: 0;
+  }
+  .inspiration-panel-text strong {
+    display: block;
+    color: var(--gold);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+  }
+  .inspiration-panel-hint {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-body);
+    line-height: 1.4;
+  }
+  .inspiration-chevron {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    color: var(--gold);
+    transition: transform 0.2s ease;
+  }
+  .inspiration-panel[open] .inspiration-chevron { transform: rotate(180deg); }
+  .inspiration-panel[open] .inspiration-panel-hint { color: var(--gold-dim); }
+  .inspiration-panel-body {
+    padding: 0 0.9rem 0.9rem;
+    border-top: 1px solid var(--border);
+    margin-top: 0;
+  }
+  .inspiration-panel:not([open]) .inspiration-panel-trigger:hover {
+    background: rgba(201, 168, 76, 0.08);
+  }
   .copyright-note {
     font-size: 0.72rem;
     color: var(--text-faint);
@@ -1106,7 +1155,8 @@
     opacity: 1;
     pointer-events: auto;
   }
-  .read-tool-btn.immersive-on { background: rgba(201,168,76,0.25); border-color: var(--gold); }
+  .read-tool-btn.immersive-on,
+  .read-tool-btn.landscape-on { background: rgba(201,168,76,0.25); border-color: var(--gold); }
 
   .reading-toolbar {
     display: flex;
@@ -1566,8 +1616,16 @@
       <input type="text" id="tone-custom" class="optional-input" placeholder="טון אחר..." maxlength="80" />
     </div>
 
-    <details class="inspiration-details">
-      <summary>✦ השראה מתקדמת (אופציונלי)</summary>
+    <details class="inspiration-panel" id="inspiration-panel">
+      <summary class="inspiration-panel-trigger" aria-expanded="false">
+        <span class="inspiration-panel-icon" aria-hidden="true">✦</span>
+        <span class="inspiration-panel-text">
+          <strong>השראה מתקדמת</strong>
+          <span class="inspiration-panel-hint">סופר · ספר מוכר — לחץ כאן להרחבה (אופציונלי)</span>
+        </span>
+        <span class="inspiration-chevron" aria-hidden="true">▼</span>
+      </summary>
+      <div class="inspiration-panel-body">
       <p class="copyright-note">השראה בלבד — לא חיקוי דמויות, עלילות או סגנון מועתק.</p>
       <div class="choice-section">
         <span class="choice-label">סופר</span>
@@ -1592,6 +1650,7 @@
           <button type="button" class="choice-tile" data-group="bookRef" data-value="other" onclick="selectChoice(this)">✏️ אחר</button>
         </div>
         <input type="text" id="bookref-custom" class="optional-input" placeholder="ספר אחר..." maxlength="60" />
+      </div>
       </div>
     </details>
 
@@ -1778,6 +1837,7 @@
       <button type="button" class="read-tool-btn" onclick="adjustFontSize(-0.08)" title="הקטן">A−</button>
       <button type="button" class="read-tool-btn" onclick="adjustFontSize(0.08)" title="הגדל">A+</button>
       <button type="button" class="read-tool-btn" onclick="toggleTheme()" title="מצב בהיר/כהה" id="theme-toggle-btn">☀</button>
+      <button type="button" class="read-tool-btn" id="landscape-toggle-btn" onclick="toggleReadingLandscape()" title="קריאה לרוחב (לחיצה מפורשת)">⤡</button>
       <button type="button" class="read-tool-btn" id="immersive-toggle-btn" onclick="toggleReadingImmersive()" title="מצב קריאה מלאה">⛶</button>
       <button type="button" class="read-tool-btn" id="wake-toggle-btn" onclick="toggleWakeLock()" title="מנע נעילת מסך">💡</button>
     </div>
@@ -2434,6 +2494,47 @@ ${state.eventLog.join('\n\n')}`;
   } catch(e) { console.warn('synopsis compress failed', e); }
 }
 
+function lockAppOrientation() {
+  if (!screen.orientation?.lock) return;
+  screen.orientation.lock('portrait-primary').catch(() => {});
+}
+
+function unlockAppOrientation() {
+  if (!screen.orientation?.unlock) return;
+  try { screen.orientation.unlock(); } catch (e) {}
+}
+
+async function toggleReadingLandscape() {
+  if (!screen.orientation?.lock) {
+    alert('סיבוב מסך אינו נתמך בדפדפן זה');
+    return;
+  }
+  const type = screen.orientation.type || '';
+  const isLandscape = type.startsWith('landscape');
+  try {
+    if (isLandscape) {
+      await screen.orientation.lock('portrait-primary');
+      app.readingPrefs.allowLandscape = false;
+    } else {
+      await screen.orientation.lock('landscape');
+      app.readingPrefs.allowLandscape = true;
+    }
+    save();
+    updateLandscapeToggleButton();
+  } catch (e) {
+    alert('לא ניתן לסובב — נסה במסך מלא או מהאפליקציה המותקנת');
+  }
+}
+
+function updateLandscapeToggleButton() {
+  const btn = document.getElementById('landscape-toggle-btn');
+  if (!btn || !screen.orientation) return;
+  const isLandscape = (screen.orientation.type || '').startsWith('landscape');
+  btn.textContent = isLandscape ? '⤒' : '⤡';
+  btn.title = isLandscape ? 'חזרה לאורך' : 'קריאה לרוחב (לחיצה מפורשת)';
+  btn.classList.toggle('landscape-on', isLandscape);
+}
+
 function applyReadingPrefs() {
   const p = app.readingPrefs || { fontScale: 1, theme: 'dark', immersive: false };
   document.documentElement.style.setProperty('--read-font-scale', String(p.fontScale || 1));
@@ -2977,11 +3078,14 @@ function showScreen(id) {
   if (id !== 'reading-screen') {
     releaseWakeLock();
     document.body.classList.remove('reading-immersive');
+    if (app.readingPrefs) app.readingPrefs.allowLandscape = false;
+    lockAppOrientation();
   }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   window.scrollTo(0, 0);
   applyReadingPrefs();
+  updateLandscapeToggleButton();
 }
 
 function showLibrary() {
@@ -4222,6 +4326,7 @@ function openChapter(idx) {
   closeChapterDrawer();
   renderReadingNav(idx);
   showScreen('reading-screen');
+  updateLandscapeToggleButton();
   const scrollY = (state.lastReadChapter === idx && state.lastReadScroll) ? state.lastReadScroll : 0;
   window.scrollTo(0, scrollY);
 
@@ -4268,8 +4373,14 @@ function deleteBookFromShelf(id, ev) {
   updateWelcomeShelfLink();
 }
 
+function enforceOrientationPolicy() {
+  if (app.readingPrefs?.allowLandscape && isReadingScreenActive()) return;
+  lockAppOrientation();
+}
+
 // ===== INIT =====
 load();
+lockAppOrientation();
 applyReadingPrefs();
 applyWelcomeDefaults();
 renderTasteProfiles();
@@ -4288,7 +4399,16 @@ window.addEventListener('appinstalled', () => {
 });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') releaseWakeLock();
+  else enforceOrientationPolicy();
 });
+window.addEventListener('orientationchange', updateLandscapeToggleButton);
+const inspirationPanel = document.getElementById('inspiration-panel');
+if (inspirationPanel) {
+  inspirationPanel.addEventListener('toggle', () => {
+    const sum = inspirationPanel.querySelector('summary');
+    if (sum) sum.setAttribute('aria-expanded', inspirationPanel.open ? 'true' : 'false');
+  });
+}
 
 if (app.apiKey || state.apiKey) {
   const keyInput = document.getElementById('api-key-input');
