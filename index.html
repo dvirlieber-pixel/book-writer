@@ -8,9 +8,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="ספריית הנצח">
-<meta name="application-name" content="ספריית הנצח">
-<title>ספריית הנצח</title>
+<meta name="apple-mobile-web-app-title" content="ספריית האינסוף">
+<meta name="application-name" content="ספריית האינסוף">
+<title>ספריית האינסוף</title>
 <link rel="manifest" href="manifest.webmanifest" type="application/manifest+json">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
@@ -1446,7 +1446,7 @@
   <button type="button" class="banner-dismiss" onclick="dismissUpdateBanner()" aria-label="סגור">✕</button>
 </div>
 <div id="app-install-banner" class="app-banner" role="dialog" aria-label="התקנת אפליקציה">
-  <span>📲 התקן את ספריית הנצח על המסך הראשי</span>
+  <span>📲 התקן את ספריית האינסוף על המסך הראשי</span>
   <button type="button" class="banner-btn" onclick="promptPwaInstall()">התקן</button>
   <button type="button" class="banner-dismiss" onclick="dismissInstallBanner()" aria-label="סגור">✕</button>
 </div>
@@ -1455,8 +1455,8 @@
 <div id="welcome-screen" class="screen active">
   <div class="logo-area">
     <div class="logo-symbol">📖</div>
-    <div class="logo-title">ספריית הנצח</div>
-    <div class="logo-subtitle">פנטזיה אפית · בסגנון ברנדון סנדרסון</div>
+    <div class="logo-title">ספריית האינסוף</div>
+    <div class="logo-subtitle">כל ספר נפתח כשאתה מוכן לקרוא</div>
   </div>
 
   <div class="welcome-card">
@@ -1600,7 +1600,7 @@
 <!-- LIBRARY SCREEN -->
 <div id="library-screen" class="screen">
   <div class="library-header">
-    <div class="title">📖 ספריית הנצח</div>
+    <div class="title">📖 ספריית האינסוף</div>
     <div class="book-title-display" id="header-book-title"></div>
     <button type="button" class="theme-toggle-global" id="theme-toggle-library" onclick="toggleTheme()" title="מצב בהיר/כהה">☀</button>
     <button class="new-book-btn" onclick="showShelf()">מדף ספרים</button>
@@ -1919,7 +1919,7 @@ async function exportBookEpub() {
     <dc:identifier id="uid">${escapeXml(uid)}</dc:identifier>
     <dc:title>${escapeXml(title)}</dc:title>
     <dc:language>he</dc:language>
-    <dc:creator>ספריית הנצח</dc:creator>
+    <dc:creator>ספריית האינסוף</dc:creator>
     <meta property="dcterms:modified">${date}T00:00:00Z</meta>
   </metadata>
   <manifest>
