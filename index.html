@@ -570,6 +570,57 @@
   }
   details.api-settings summary::-webkit-details-marker { display: none; }
 
+  .api-info-box {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(201,168,76,0.06);
+    border: 1px solid rgba(201,168,76,0.15);
+    border-radius: 1px;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    color: rgba(245,239,227,0.72);
+  }
+  .api-info-box strong { color: var(--gold); font-weight: 600; }
+  .api-guide-link {
+    display: inline-block;
+    margin-top: 0.65rem;
+    color: var(--gold);
+    text-decoration: underline;
+    font-size: 0.85rem;
+  }
+  .api-guide-link:hover { color: var(--parchment); }
+  .api-privacy-note {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(201,168,76,0.12);
+    font-size: 0.78rem;
+    color: rgba(245,239,227,0.5);
+    line-height: 1.55;
+  }
+  .api-key-status {
+    font-size: 0.78rem;
+    margin-top: 0.5rem;
+    color: var(--gold-dim);
+  }
+  .api-key-status.saved { color: #8fbc8f; }
+  .api-key-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  .api-key-row input { flex: 1; }
+  .api-show-key-btn {
+    background: rgba(201,168,76,0.1);
+    border: 1px solid rgba(201,168,76,0.25);
+    color: var(--gold-dim);
+    padding: 0 0.75rem;
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .api-show-key-btn:hover { border-color: var(--gold); color: var(--gold); }
+
   .taste-options {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -944,11 +995,24 @@
       </button>
     </div>
 
-    <details class="api-settings">
-      <summary>⚙ הגדרות (מפתח API)</summary>
+    <details class="api-settings" id="api-settings-details">
+      <summary>🔑 המפתח שלך (חובה פעם אחת)</summary>
+      <div class="api-info-box">
+        <strong>למה צריך מפתח?</strong>
+        האפליקציה יוצרת פרקים דרך Google Gemini. כל משתמש מביא <strong>מפתח חינמי משלו</strong> — אין מפתח מרכזי, ואין חיוב דרכנו.
+        <a class="api-guide-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">← איך מקבלים מפתח חינמי ב-Google AI Studio</a>
+        <div class="api-privacy-note">
+          🔒 המפתח נשמר רק בדפדפן שלך (localStorage). הוא לא נשלח לשרת שלנו — רק ישירות ממך ל-Google. אפשר למחוק אותו בכל עת על ידי ניקוי נתוני האתר.
+        </div>
+      </div>
       <div class="key-input-area" style="margin-top:1rem">
-        <label>מפתח Gemini API (חינמי)</label>
-        <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" />
+        <label for="api-key-input">מפתח Gemini API</label>
+        <div class="api-key-row">
+          <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off"
+            oninput="onApiKeyInput()" onblur="saveApiKeyFromInput()" />
+          <button type="button" class="api-show-key-btn" onclick="toggleApiKeyVisibility()">הצג</button>
+        </div>
+        <div class="api-key-status" id="api-key-status"></div>
       </div>
     </details>
 
@@ -965,6 +1029,7 @@
 <div id="shelf-screen" class="screen">
   <div class="shelf-header">
     <div class="title" style="font-family:'Frank Ruhl Libre',serif;font-size:1.4rem;color:var(--gold)">📚 המדף שלי</div>
+    <button class="new-book-btn" onclick="openWelcomeApiSettings()">🔑 מפתח API</button>
     <button class="new-book-btn" onclick="openWelcomeNewBook()">+ ספר חדש</button>
   </div>
   <div class="shelf-body">
@@ -1286,6 +1351,53 @@ function startRandomBook() {
   startBookCreation();
 }
 
+function getStoredApiKey() {
+  return (document.getElementById('api-key-input')?.value.trim() || app.apiKey || state.apiKey || '').trim();
+}
+
+function updateApiKeyStatus() {
+  const el = document.getElementById('api-key-status');
+  if (!el) return;
+  const key = getStoredApiKey();
+  if (key.length > 8) {
+    el.textContent = '✓ מפתח שמור במכשיר זה (מסתיים ב-…' + key.slice(-4) + ')';
+    el.className = 'api-key-status saved';
+  } else {
+    el.textContent = 'טרם הוזן מפתח — נדרש לפני פתיחת ספר';
+    el.className = 'api-key-status';
+  }
+}
+
+function onApiKeyInput() {
+  updateApiKeyStatus();
+}
+
+function saveApiKeyFromInput() {
+  const key = document.getElementById('api-key-input')?.value.trim();
+  if (!key) return;
+  app.apiKey = key;
+  state.apiKey = key;
+  save();
+  updateApiKeyStatus();
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('api-key-input');
+  const btn = input?.nextElementSibling;
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  if (btn) btn.textContent = show ? 'הסתר' : 'הצג';
+}
+
+function openWelcomeApiSettings() {
+  openWelcomeNewBook();
+  const details = document.getElementById('api-settings-details');
+  if (details) details.open = true;
+  updateApiKeyStatus();
+  setTimeout(() => document.getElementById('api-key-input')?.focus(), 100);
+}
+
 function setWritingStatus(msg) {
   const el = document.getElementById('writing-status-text');
   if (el) el.textContent = msg;
@@ -1486,9 +1598,11 @@ function mergeContinuation(existing, continuation) {
 
 // ===== BOOK CREATION =====
 async function startBookCreation() {
-  const apiKey = document.getElementById('api-key-input').value.trim();
+  const apiKey = getStoredApiKey();
   if (!apiKey) {
-    showError('welcome-error', 'אנא הזן מפתח API');
+    const details = document.getElementById('api-settings-details');
+    if (details) details.open = true;
+    showError('welcome-error', 'נדרש מפתח Gemini אישי. פתח את "המפתח שלך" למעלה, או קבל מפתח חינמי ב-Google AI Studio.');
     return;
   }
 
@@ -2255,6 +2369,9 @@ if (app.apiKey || state.apiKey) {
   const keyInput = document.getElementById('api-key-input');
   if (keyInput) keyInput.value = app.apiKey || state.apiKey;
 }
+updateApiKeyStatus();
+const apiDetails = document.getElementById('api-settings-details');
+if (apiDetails && !getStoredApiKey()) apiDetails.open = true;
 
 if (shelfCount() > 1) {
   renderShelf();
