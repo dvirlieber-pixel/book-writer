@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="ספריית ספרי פנטזיה אישית — כתיבה, קריאה ושמירה על המדף">
+<meta name="description" content="ספריית ספרים אישית — בחירת ז'אנר, קריאה והמשך כשאתה מוכן">
 <meta name="theme-color" content="#1a1410">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1683,7 +1683,7 @@
 <div id="sequel-screen" class="screen">
   <div class="logo-area" style="padding-top:2rem">
     <div class="logo-symbol">🌍</div>
-    <div class="logo-title" style="font-size:2rem">המשך בעולם הזה</div>
+    <div class="logo-title" style="font-size:2rem">עוד סיפור באותו עולם</div>
   </div>
   <div class="welcome-card">
     <h2>ספר חדש באותו עולם</h2>
@@ -1884,12 +1884,12 @@ function defaultBookProfile() {
 
 function migrateLegacyTaste(taste) {
   const map = {
-    'hard-magic': { genre: 'fantasy', tone: 'classic' },
+    'hard-magic': { genre: 'fantasy', tone: 'classic', author: 'sanderson' },
     mystery: { genre: 'mystery', tone: 'classic' },
     war: { genre: 'historical', tone: 'action' },
     character: { genre: 'romance', tone: 'philosophical' }
   };
-  return { ...defaultBookProfile(), ...(map[taste] || { genre: 'fantasy', tone: 'classic' }) };
+  return { ...defaultBookProfile(), ...(map[taste] || { genre: 'fantasy', tone: 'classic', author: 'sanderson' }) };
 }
 
 function getBookProfile(snap) {
@@ -2635,6 +2635,7 @@ function onImportLibraryFile(ev) {
       if (data.apiKey) app.apiKey = data.apiKey;
       if (data.readingPrefs) app.readingPrefs = { ...app.readingPrefs, ...data.readingPrefs };
       if (data.tasteProfiles?.length) app.tasteProfiles = data.tasteProfiles;
+      migrateBooksInApp();
       const ids = Object.keys(app.books);
       if (ids.length) {
         applyBookSnapshot(app.books[ids[ids.length - 1]]);
@@ -3620,9 +3621,10 @@ function refreshReadingEndActions() {
 }
 
 async function planChapter(idx) {
-  const book = state.book;
+  const book = normalizeBlueprint(state.book);
   const outline = book.chapterOutlines[idx];
   const memoryContext = formatMemoryBookForPrompt();
+  const b = book;
 
   let priorContext = '';
   if (idx > 0) priorContext = getStoryContextForPrompt();
@@ -3638,6 +3640,10 @@ async function planChapter(idx) {
 }
 
 **ספר:** ${book.title}
+**ז'אנר:** ${book.genre || genreDisplayLabel()}
+**הגדרה:** ${b.setting || b.world || '—'}
+**כללי עולם:** ${b.coreRules || b.magicSystem || '—'}
+**קונפליקט:** ${b.centralConflict || '—'}
 **פרק ${outline.number}:** ${outline.title} — ${outline.summary}
 **נקודת מבט:** ${outline.pov}
 
@@ -3764,7 +3770,7 @@ ${chapterText.substring(0, 6000)}
   try {
     const raw = await callGemini(prompt, '', 4000);
     const updated = parseJsonFromResponse(raw);
-    if (updated?.characters) state.memoryBook = updated;
+    if (updated?.characters) state.memoryBook = migrateMemoryBook(updated);
   } catch(e) {
     console.warn('updateMemoryBook failed:', e);
   }
@@ -3803,12 +3809,15 @@ function buildChapterContext(idx, plan) {
     lastChapterSnippet = `**שורות הסיום של הפרק הקודם:**\n"${lines.substring(0, 500)}..."`;
   }
 
+  const b = normalizeBlueprint(book);
   const planContext = `**תכנון הפרק:**
 מטרה: ${plan.chapterGoal || outline.summary}
 מיקוד POV: ${plan.povFocus || outline.pov}
 חובות עקביות: ${(plan.continuityMust || []).join('; ') || '—'}
 תעלומות: ${(plan.mysteryHooks || []).join('; ') || '—'}
-כללי עולם: ${plan.worldRulesUse || plan.magicUse || book.coreRules || book.magicSystem || '—'}`;
+כללי עולם: ${plan.worldRulesUse || plan.magicUse || b.coreRules || b.magicSystem || '—'}
+**הגדרת הספר:** ${b.setting || b.world || '—'}
+**קונפליקט מרכזי:** ${b.centralConflict || '—'}`;
 
   return { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext };
 }
@@ -3957,7 +3966,7 @@ function renderLibrary() {
     ? `<span>📜 ספר ${state.sequelIndex} · ${state.seriesTitle || book.title}</span>` : '';
 
   document.getElementById('book-meta').innerHTML =
-    `<span>📚 ${total} פרקים</span><span>✨ ${book.genre || 'פנטזיה אפית'}</span>` +
+    `<span>📚 ${total} פרקים</span><span>✨ ${escapeHtml(book.genre || genreDisplayLabel())}</span>` +
     `<span>🎭 ${escapeHtml(genreDisplayLabel())}</span><span>👁 ${writtenCount} זמינים</span>${seriesBadge}`;
   document.getElementById('book-tagline').textContent = book.tagline || '';
 
