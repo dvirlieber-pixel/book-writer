@@ -16,7 +16,16 @@
     --rust: #7a3b1e;
     --shadow: rgba(26,20,16,0.4);
     --glow: rgba(201,168,76,0.15);
+    --read-font-scale: 1;
   }
+
+  body.theme-light {
+    --ink: #f5efe3;
+    --parchment: #1a1410;
+    --parchment-dark: #2a2218;
+    --gold-dim: #a68b3a;
+  }
+  body.theme-light body::before { opacity: 0.5; }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -561,6 +570,107 @@
   }
   details.api-settings summary::-webkit-details-marker { display: none; }
 
+  .taste-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin: 1.25rem 0;
+  }
+  .taste-btn {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(201,168,76,0.15);
+    color: var(--parchment);
+    padding: 0.65rem 0.5rem;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 1px;
+  }
+  .taste-btn:hover, .taste-btn.selected {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.1);
+    color: var(--gold);
+  }
+
+  .welcome-links {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+  }
+  .welcome-links button {
+    background: none;
+    border: none;
+    color: var(--gold-dim);
+    cursor: pointer;
+    font-family: inherit;
+    text-decoration: underline;
+    padding: 0;
+  }
+
+  /* Shelf */
+  #shelf-screen { flex-direction: column; min-height: 100vh; }
+  .shelf-header {
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid rgba(201,168,76,0.15);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .shelf-body {
+    padding: 2rem;
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
+    flex: 1;
+  }
+  .shelf-grid { display: flex; flex-direction: column; gap: 0.75rem; }
+  .shelf-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    text-align: right;
+    background: rgba(245,239,227,0.04);
+    border: 1px solid rgba(201,168,76,0.2);
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--parchment);
+    transition: all 0.2s;
+  }
+  .shelf-card:hover {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.08);
+  }
+  .shelf-card-title {
+    font-family: 'Frank Ruhl Libre', serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--gold);
+  }
+  .shelf-card-meta { font-size: 0.8rem; color: rgba(245,239,227,0.5); margin-top: 0.25rem; }
+  .shelf-empty { text-align: center; color: rgba(245,239,227,0.45); padding: 3rem 1rem; }
+
+  .reading-toolbar {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+  }
+  .read-tool-btn {
+    background: rgba(201,168,76,0.1);
+    border: 1px solid rgba(201,168,76,0.25);
+    color: var(--gold);
+    width: 2rem;
+    height: 2rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 1px;
+  }
+  .read-tool-btn:hover { background: rgba(201,168,76,0.2); }
+
   .dot-anim span {
     animation: dot-bounce 1.4s ease-in-out infinite;
     display: inline-block;
@@ -664,7 +774,7 @@
   }
 
   .chapter-content {
-    font-size: clamp(1rem, 2.5vw, 1.1rem);
+    font-size: calc(clamp(1rem, 2.5vw, 1.1rem) * var(--read-font-scale));
     line-height: 1.95;
     color: rgba(245,239,227,0.88);
     text-align: justify;
@@ -811,6 +921,14 @@
     <h2>ספר חדש מחכה לך</h2>
     <p>בחר אורך, לחץ "פתח ספר" — והתחל לקרוא. העולם והפרקים נבנים מאחורי הקלעים.</p>
 
+    <p style="font-size:0.8rem;color:var(--gold-dim);margin-bottom:0.5rem">איזה סוג הרפתקה?</p>
+    <div class="taste-options" id="taste-options">
+      <button type="button" class="taste-btn selected" data-taste="hard-magic" onclick="selectTaste(this,'hard-magic')">קסם קשה</button>
+      <button type="button" class="taste-btn" data-taste="mystery" onclick="selectTaste(this,'mystery')">מסתורין</button>
+      <button type="button" class="taste-btn" data-taste="war" onclick="selectTaste(this,'war')">מלחמה ופוליטיקה</button>
+      <button type="button" class="taste-btn" data-taste="character" onclick="selectTaste(this,'character')">דמויות ויחסים</button>
+    </div>
+
     <div class="length-options">
       <button class="length-btn selected" onclick="selectLength(this, 15)">
         <span class="chapters-count">15</span>
@@ -835,7 +953,22 @@
     </details>
 
     <button class="create-btn" id="create-btn" onclick="startBookCreation()">✦ פתח ספר חדש ✦</button>
+    <button type="button" class="taste-btn" style="width:100%;margin-top:0.75rem" onclick="startRandomBook()">🎲 ספר אקראי — הפתע אותי</button>
+    <div class="welcome-links" id="welcome-shelf-link" style="display:none">
+      <button type="button" onclick="showShelf()">← חזרה למדף הספרים</button>
+    </div>
     <div id="welcome-error" class="error-msg" style="display:none"></div>
+  </div>
+</div>
+
+<!-- SHELF SCREEN -->
+<div id="shelf-screen" class="screen">
+  <div class="shelf-header">
+    <div class="title" style="font-family:'Frank Ruhl Libre',serif;font-size:1.4rem;color:var(--gold)">📚 המדף שלי</div>
+    <button class="new-book-btn" onclick="openWelcomeNewBook()">+ ספר חדש</button>
+  </div>
+  <div class="shelf-body">
+    <div class="shelf-grid" id="shelf-grid"></div>
   </div>
 </div>
 
@@ -852,7 +985,8 @@
   <div class="library-header">
     <div class="title">📖 ספריית הנצח</div>
     <div class="book-title-display" id="header-book-title"></div>
-    <button class="new-book-btn" onclick="newBook()">ספר חדש</button>
+    <button class="new-book-btn" onclick="showShelf()">מדף ספרים</button>
+    <button class="new-book-btn" onclick="openWelcomeNewBook()">+ חדש</button>
   </div>
 
   <div class="library-body">
@@ -890,7 +1024,11 @@
   <div class="reading-header">
     <button class="back-btn" onclick="showLibrary()">← חזרה</button>
     <div class="reading-chapter-label" id="reading-chapter-label"></div>
-    <div style="width:60px"></div>
+    <div class="reading-toolbar">
+      <button type="button" class="read-tool-btn" onclick="adjustFontSize(-0.08)" title="הקטן">A−</button>
+      <button type="button" class="read-tool-btn" onclick="adjustFontSize(0.08)" title="הגדל">A+</button>
+      <button type="button" class="read-tool-btn" onclick="toggleTheme()" title="מצב קריאה" id="theme-toggle-btn">☀</button>
+    </div>
   </div>
 
   <div class="reading-body">
@@ -913,35 +1051,239 @@
 
 <script>
 // ===== STATE =====
-let state = {
-  apiKey: '',
-  totalChapters: 15,
-  book: null,       // { title, tagline, world, characters, magicSystem, chapterOutlines[] }
-  chapters: [],     // written chapter texts { title, text, number, summary }
-  eventLog: [],     // running story log: array of strings, one per chapter
-  memoryBook: null, // ספר הזיכרון: characters, locations, artifacts, magicRules, openMysteries
-  writing: false,
-  generatingIdx: null,
-  lastReadChapter: 0,
-  currentReadingChapter: 0
+const STORAGE_KEY_V1 = 'sanderson-library-v1';
+const STORAGE_KEY = 'sanderson-library-v2';
+
+const TASTES = {
+  'hard-magic': 'דגש על מערכת קסם מחושבת עם חוקים ברורים, מחיר למימוש קסם, וגילוי הדרגתי של הכללים',
+  'mystery': 'דגש על תעלומות, רמזים, חשדות, וחשיפות הדרגתיות — הקורא צריך לרצות לפתור',
+  'war': 'דגש על סכסוכים, פוליטיקה, מלחמות, בריתות ובגידות — אסקלציה של הימור',
+  'character': 'דגש על דמויות, יחסים, קונפליקטים רגשיים, וצמיחה אישית'
 };
 
-const STORAGE_KEY = 'sanderson-library-v1';
+let app = { apiKey: '', currentBookId: null, books: {}, readingPrefs: { fontScale: 1, theme: 'dark' } };
+let state = createEmptyBookState();
+let selectedTaste = 'hard-magic';
+
+function createEmptyBookState() {
+  return {
+    id: null,
+    taste: 'hard-magic',
+    apiKey: '',
+    totalChapters: 15,
+    book: null,
+    chapters: [],
+    eventLog: [],
+    storySynopsis: '',
+    memoryBook: null,
+    writing: false,
+    generatingIdx: null,
+    lastReadChapter: 0,
+    currentReadingChapter: 0,
+    createdAt: null
+  };
+}
+
+function newBookId() {
+  return 'book_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function bookSnapshot() {
+  return {
+    id: state.id,
+    taste: state.taste,
+    totalChapters: state.totalChapters,
+    book: state.book,
+    chapters: state.chapters,
+    eventLog: state.eventLog,
+    storySynopsis: state.storySynopsis || '',
+    memoryBook: state.memoryBook,
+    lastReadChapter: state.lastReadChapter,
+    createdAt: state.createdAt || Date.now()
+  };
+}
+
+function applyBookSnapshot(snap) {
+  state = { ...createEmptyBookState(), ...snap, apiKey: app.apiKey, writing: false, generatingIdx: null };
+  ensureMemoryBook();
+}
 
 function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+  try {
+    if (state.book && state.id) app.books[state.id] = bookSnapshot();
+    if (state.apiKey) app.apiKey = state.apiKey;
+    if (state.id) app.currentBookId = state.id;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(app));
+  } catch(e) {}
 }
 
 function load() {
   try {
-    const s = localStorage.getItem(STORAGE_KEY);
-    if (s) state = JSON.parse(s);
-    ensureMemoryBook();
-    if (state.writing) {
-      state.writing = false;
-      save();
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      const v1 = localStorage.getItem(STORAGE_KEY_V1);
+      if (v1) {
+        const old = JSON.parse(v1);
+        app = { apiKey: old.apiKey || '', currentBookId: null, books: {}, readingPrefs: { fontScale: 1, theme: 'dark' } };
+        if (old.book) {
+          const id = newBookId();
+          old.id = id;
+          old.taste = old.taste || 'hard-magic';
+          old.storySynopsis = old.storySynopsis || '';
+          app.books[id] = {
+            id, taste: old.taste, totalChapters: old.totalChapters,
+            book: old.book, chapters: old.chapters || [], eventLog: old.eventLog || [],
+            storySynopsis: old.storySynopsis, memoryBook: old.memoryBook,
+            lastReadChapter: old.lastReadChapter || 0, createdAt: Date.now()
+          };
+          app.currentBookId = id;
+        }
+        save();
+      }
+    } else {
+      app = JSON.parse(raw);
+      if (!app.books) app.books = {};
+      if (!app.readingPrefs) app.readingPrefs = { fontScale: 1, theme: 'dark' };
     }
-  } catch(e) {}
+    const ids = Object.keys(app.books);
+    if (app.currentBookId && app.books[app.currentBookId]) {
+      applyBookSnapshot(app.books[app.currentBookId]);
+    } else if (ids.length) {
+      applyBookSnapshot(app.books[ids[ids.length - 1]]);
+      app.currentBookId = state.id;
+    } else {
+      state = createEmptyBookState();
+      state.apiKey = app.apiKey || '';
+    }
+    state.apiKey = app.apiKey || state.apiKey || '';
+    if (state.writing) { state.writing = false; save(); }
+  } catch(e) {
+    state = createEmptyBookState();
+  }
+}
+
+function getStoryContextForPrompt() {
+  let parts = [];
+  if (state.storySynopsis) parts.push(`**עד כה בסיפור (סיכום):**\n${state.storySynopsis}`);
+  const recent = state.eventLog?.slice(-3) || [];
+  if (recent.length) parts.push(`**אירועים בפרקים האחרונים:**\n${recent.join('\n\n')}`);
+  return parts.join('\n\n');
+}
+
+async function maybeCompressStorySynopsis() {
+  const n = state.chapters.length;
+  if (n < 5 || n % 5 !== 0) return;
+  const prompt = `סכם את עלילת ספר הפנטזיה עד כה ב-14-18 משפטים בעברית.
+כלול: דמויות מרכזיות, קונפליקט, מטרות, תעלומות פתוחות, ומצב אחרון.
+כתוב בנקודות קצרות. ללא הקדמה.
+
+${state.storySynopsis ? 'סיכום קודם:\n' + state.storySynopsis + '\n\n' : ''}
+יומן פרקים:
+${state.eventLog.join('\n\n')}`;
+
+  try {
+    const synopsis = await callGemini(prompt, '', 1500);
+    if (synopsis?.trim()) state.storySynopsis = synopsis.trim();
+  } catch(e) { console.warn('synopsis compress failed', e); }
+}
+
+function applyReadingPrefs() {
+  const p = app.readingPrefs || { fontScale: 1, theme: 'dark' };
+  document.documentElement.style.setProperty('--read-font-scale', String(p.fontScale || 1));
+  document.body.classList.toggle('theme-light', p.theme === 'light');
+  const tb = document.getElementById('theme-toggle-btn');
+  if (tb) tb.textContent = p.theme === 'light' ? '☾' : '☀';
+}
+
+function adjustFontSize(delta) {
+  app.readingPrefs.fontScale = Math.min(1.4, Math.max(0.85, (app.readingPrefs.fontScale || 1) + delta));
+  applyReadingPrefs();
+  save();
+}
+
+function toggleTheme() {
+  app.readingPrefs.theme = app.readingPrefs.theme === 'light' ? 'dark' : 'light';
+  applyReadingPrefs();
+  save();
+}
+
+function selectTaste(btn, taste) {
+  document.querySelectorAll('.taste-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedTaste = taste;
+}
+
+function shelfCount() {
+  return Object.keys(app.books || {}).length;
+}
+
+const TASTE_LABELS = { 'hard-magic': 'קסם קשה', mystery: 'מסתורין', war: 'מלחמה', character: 'דמויות' };
+
+function renderShelf() {
+  const grid = document.getElementById('shelf-grid');
+  if (!grid) return;
+  const ids = Object.keys(app.books).sort((a, b) =>
+    (app.books[b].createdAt || 0) - (app.books[a].createdAt || 0));
+  if (!ids.length) {
+    grid.innerHTML = '<div class="shelf-empty">אין ספרים במדף — פתח ספר חדש להתחיל</div>';
+    return;
+  }
+  grid.innerHTML = '';
+  ids.forEach(id => {
+    const b = app.books[id];
+    const written = b.chapters?.length || 0;
+    const total = b.totalChapters || 0;
+    const card = document.createElement('button');
+    card.className = 'shelf-card';
+    card.innerHTML = `
+      <div style="flex:1">
+        <div class="shelf-card-title">${b.book?.title || 'ספר ללא שם'}</div>
+        <div class="shelf-card-meta">${written} / ${total} פרקים זמינים · ${TASTE_LABELS[b.taste] || 'פנטזיה'}</div>
+      </div>
+      <span style="color:var(--gold);font-size:1.2rem">📖</span>
+      <button type="button" class="read-tool-btn" title="מחק" onclick="deleteBookFromShelf('${id}', event)">✕</button>`;
+    card.onclick = () => openBookFromShelf(id);
+    grid.appendChild(card);
+  });
+}
+
+function openBookFromShelf(id) {
+  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+  applyBookSnapshot(app.books[id]);
+  app.currentBookId = id;
+  state.apiKey = app.apiKey;
+  save();
+  renderLibrary();
+  if (state.chapters.length > 0) prefetchChapter(state.chapters.length);
+  showScreen('library-screen');
+}
+
+function showShelf() {
+  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+  save();
+  renderShelf();
+  updateWelcomeShelfLink();
+  showScreen('shelf-screen');
+}
+
+function openWelcomeNewBook() {
+  showScreen('welcome-screen');
+  updateWelcomeShelfLink();
+  document.getElementById('create-btn').disabled = false;
+}
+
+function updateWelcomeShelfLink() {
+  const link = document.getElementById('welcome-shelf-link');
+  if (link) link.style.display = shelfCount() > 0 ? 'block' : 'none';
+}
+
+function startRandomBook() {
+  const keys = Object.keys(TASTES);
+  selectedTaste = keys[Math.floor(Math.random() * keys.length)];
+  document.querySelectorAll('.taste-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.taste === selectedTaste);
+  });
+  startBookCreation();
 }
 
 function setWritingStatus(msg) {
@@ -1151,6 +1493,11 @@ async function startBookCreation() {
   }
 
   state.apiKey = apiKey;
+  app.apiKey = apiKey;
+  state.id = newBookId();
+  state.taste = selectedTaste;
+  state.createdAt = Date.now();
+  app.currentBookId = state.id;
   document.getElementById('create-btn').disabled = true;
   document.getElementById('welcome-error').style.display = 'none';
   showScreen('loading-screen');
@@ -1175,10 +1522,10 @@ async function startBookCreation() {
     state.chapters = [];
     state.eventLog = [];
     state.memoryBook = initMemoryBookFromBlueprint(bookData);
+    app.books[state.id] = bookSnapshot();
     save();
 
     clearInterval(statusInterval);
-    save();
     renderLibrary();
     document.getElementById('loading-status').textContent = 'מכין את הפרק הראשון...';
     await generateChapterAt(0, { openAfter: true, useLoadingScreen: true });
@@ -1192,9 +1539,10 @@ async function startBookCreation() {
 
 async function createBookBlueprint() {
   const n = state.totalChapters;
+  const tasteHint = TASTES[state.taste] || TASTES['hard-magic'];
 
-  // Build prompt - keep summaries SHORT to avoid token limit
   const prompt = `צור תוכנית לספר פנטזיה אפי בעברית בסגנון ברנדון סנדרסון עם ${n} פרקים.
+טעם הספר: ${tasteHint}
 
 החזר JSON בלבד, ללא markdown, ללא הסברים:
 {
@@ -1308,6 +1656,7 @@ async function generateChapterAt(idx, { background = false, openAfter = false, u
     const summary = await summarizeChapter(text, chapterNum, outline);
     if (!state.eventLog) state.eventLog = [];
     state.eventLog.push(`פרק ${chapterNum} (${outline.title}):\n${summary}`);
+    await maybeCompressStorySynopsis();
 
     state.writing = false;
     state.generatingIdx = null;
@@ -1409,9 +1758,7 @@ async function planChapter(idx) {
   const memoryContext = formatMemoryBookForPrompt();
 
   let priorContext = '';
-  if (idx > 0 && state.eventLog?.length) {
-    priorContext = `**יומן אירועים:**\n${state.eventLog.join('\n\n')}`;
-  }
+  if (idx > 0) priorContext = getStoryContextForPrompt();
 
   const prompt = `תכנן את הפרק הבא לפני כתיבה. החזר JSON בלבד:
 {
@@ -1578,9 +1925,7 @@ function buildChapterContext(idx, plan) {
   const memoryContext = formatMemoryBookForPrompt();
 
   let eventLogContext = '';
-  if (idx > 0 && state.eventLog?.length) {
-    eventLogContext = `**יומן אירועים — מה קרה עד כה:**\n${state.eventLog.join('\n\n')}`;
-  }
+  if (idx > 0) eventLogContext = getStoryContextForPrompt();
 
   let lastChapterSnippet = '';
   if (idx > 0 && state.chapters.length > 0) {
@@ -1719,8 +2064,12 @@ function renderLibrary() {
 
   // Book info
   document.getElementById('book-title-main').textContent = book.title;
+  const oldComplete = document.getElementById('book-complete-msg');
+  if (oldComplete) oldComplete.remove();
+
   document.getElementById('book-meta').innerHTML =
-    `<span>📚 ${total} פרקים</span><span>✨ ${book.genre || 'פנטזיה אפית'}</span><span>👁 ${writtenCount} זמינים</span>`;
+    `<span>📚 ${total} פרקים</span><span>✨ ${book.genre || 'פנטזיה אפית'}</span>` +
+    `<span>🎭 ${TASTE_LABELS[state.taste] || 'פנטזיה'}</span><span>👁 ${writtenCount} זמינים</span>`;
   document.getElementById('book-tagline').textContent = book.tagline || '';
 
   // Progress
@@ -1877,35 +2226,45 @@ function showError(id, msg) {
   if (el) { el.textContent = msg; el.style.display = 'block'; }
 }
 
-function newBook() {
-  if (!confirm('ליצור ספר חדש? הספר הנוכחי יימחק.')) return;
-  state.book = null;
-  state.chapters = [];
-  state.eventLog = [];
-  state.memoryBook = null;
-  state.writing = false;
-  state.generatingIdx = null;
-  state.lastReadChapter = 0;
+function deleteBookFromShelf(id, ev) {
+  if (ev) ev.stopPropagation();
+  if (!confirm('למחוק את הספר מהמדף?')) return;
+  delete app.books[id];
+  if (app.currentBookId === id) {
+    const ids = Object.keys(app.books);
+    if (ids.length) {
+      applyBookSnapshot(app.books[ids[ids.length - 1]]);
+      app.currentBookId = state.id;
+    } else {
+      state = createEmptyBookState();
+      state.apiKey = app.apiKey;
+      app.currentBookId = null;
+    }
+  }
   save();
-  showScreen('welcome-screen');
-  document.getElementById('create-btn').disabled = false;
-  document.getElementById('welcome-error').style.display = 'none';
+  renderShelf();
+  updateWelcomeShelfLink();
 }
 
 // ===== INIT =====
 load();
+applyReadingPrefs();
+updateWelcomeShelfLink();
 
-if (state.apiKey) {
+if (app.apiKey || state.apiKey) {
   const keyInput = document.getElementById('api-key-input');
-  if (keyInput) keyInput.value = state.apiKey;
+  if (keyInput) keyInput.value = app.apiKey || state.apiKey;
 }
 
-if (state.book) {
+if (shelfCount() > 1) {
+  renderShelf();
+  showScreen('shelf-screen');
+} else if (state.book) {
   renderLibrary();
-  if (state.chapters.length > 0) {
-    prefetchChapter(state.chapters.length);
-  }
+  if (state.chapters.length > 0) prefetchChapter(state.chapters.length);
   showScreen('library-screen');
+} else if (shelfCount() === 1) {
+  openBookFromShelf(Object.keys(app.books)[0]);
 } else {
   showScreen('welcome-screen');
 }
