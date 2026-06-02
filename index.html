@@ -18,7 +18,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@300;400;600;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
-  :root {
+  :root,
+  body.theme-dark {
+    color-scheme: dark;
     --ink: #1a1410;
     --parchment: #f5efe3;
     --parchment-dark: #ede4d0;
@@ -28,15 +30,51 @@
     --shadow: rgba(26,20,16,0.4);
     --glow: rgba(201,168,76,0.15);
     --read-font-scale: 1;
+    --text-muted: rgba(245,239,227,0.6);
+    --text-faint: rgba(245,239,227,0.45);
+    --surface: rgba(245,239,227,0.04);
+    --surface-hover: rgba(201,168,76,0.08);
+    --border: rgba(201,168,76,0.2);
+    --border-strong: rgba(201,168,76,0.35);
+    --input-bg: rgba(255,255,255,0.04);
+    --banner-bg: #7a3b1e;
+    --banner-text: #f5efe3;
+    --error-bg: rgba(122,59,30,0.2);
+    --error-border: rgba(122,59,30,0.4);
+    --error-text: #e8a87c;
+    --meta-bg: rgba(201,168,76,0.12);
+    --meta-done-bg: rgba(143,188,143,0.2);
+    --meta-continue-bg: rgba(201,168,76,0.28);
   }
 
   body.theme-light {
-    --ink: #f5efe3;
+    color-scheme: light;
+    --ink: #ebe4d4;
     --parchment: #1a1410;
-    --parchment-dark: #2a2218;
-    --gold-dim: #a68b3a;
+    --parchment-dark: #2e261c;
+    --gold: #8a6f2e;
+    --gold-dim: #6d5724;
+    --rust: #9a4a28;
+    --shadow: rgba(26,20,16,0.12);
+    --glow: rgba(138,111,46,0.12);
+    --text-muted: rgba(26,20,16,0.68);
+    --text-faint: rgba(26,20,16,0.5);
+    --surface: rgba(26,20,16,0.05);
+    --surface-hover: rgba(138,111,46,0.1);
+    --border: rgba(138,111,46,0.28);
+    --border-strong: rgba(138,111,46,0.45);
+    --input-bg: rgba(26,20,16,0.04);
+    --banner-bg: #c9a84c;
+    --banner-text: #1a1410;
+    --error-bg: rgba(154,74,40,0.12);
+    --error-border: rgba(154,74,40,0.35);
+    --error-text: #7a3b1e;
+    --meta-bg: rgba(138,111,46,0.14);
+    --meta-done-bg: rgba(80,120,80,0.18);
+    --meta-continue-bg: rgba(138,111,46,0.22);
   }
-  body.theme-light body::before { opacity: 0.5; }
+
+  body.theme-light::before { opacity: 0.35; }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -123,8 +161,8 @@
   }
 
   .welcome-card {
-    background: rgba(245,239,227,0.04);
-    border: 1px solid rgba(201,168,76,0.2);
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 2px;
     padding: 2.5rem;
     max-width: 480px;
@@ -143,7 +181,7 @@
 
   .welcome-card p {
     font-size: 0.9rem;
-    color: rgba(245,239,227,0.6);
+    color: var(--text-muted);
     margin-bottom: 2rem;
     line-height: 1.7;
   }
@@ -199,8 +237,8 @@
   }
 
   .key-input-area input {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(201,168,76,0.25);
+    background: var(--input-bg);
+    border: 1px solid var(--border-strong);
     color: var(--parchment);
     padding: 0.75rem 1rem;
     font-family: monospace;
@@ -802,8 +840,8 @@
     gap: 1rem;
     width: 100%;
     text-align: right;
-    background: rgba(245,239,227,0.04);
-    border: 1px solid rgba(201,168,76,0.2);
+    background: var(--surface);
+    border: 1px solid var(--border);
     padding: 1rem 1.25rem;
     cursor: pointer;
     font-family: inherit;
@@ -812,7 +850,7 @@
   }
   .shelf-card:hover {
     border-color: var(--gold);
-    background: rgba(201,168,76,0.08);
+    background: var(--surface-hover);
   }
   .shelf-card-title {
     font-family: 'Frank Ruhl Libre', serif;
@@ -820,8 +858,147 @@
     font-size: 1.1rem;
     color: var(--gold);
   }
-  .shelf-card-meta { font-size: 0.8rem; color: rgba(245,239,227,0.5); margin-top: 0.25rem; }
-  .shelf-empty { text-align: center; color: rgba(245,239,227,0.45); padding: 3rem 1rem; }
+  .shelf-card-meta { font-size: 0.8rem; color: var(--text-faint); margin-top: 0.35rem; display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+  .shelf-empty { text-align: center; color: var(--text-faint); padding: 3rem 1rem; }
+  .shelf-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .shelf-toolbar label { font-size: 0.78rem; color: var(--gold-dim); }
+  .shelf-toolbar select {
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    color: var(--parchment);
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 1px;
+  }
+  .meta-pill {
+    display: inline-block;
+    background: var(--meta-bg);
+    border-radius: 999px;
+    padding: 0.1rem 0.55rem;
+    font-size: 0.72rem;
+    line-height: 1.5;
+  }
+  .meta-pill.meta-done { background: var(--meta-done-bg); }
+  .meta-pill.meta-continue { background: var(--meta-continue-bg); color: var(--gold); font-weight: 600; }
+  .meta-pill.meta-series { background: var(--surface-hover); }
+  .shelf-card-actions { display: flex; flex-direction: column; gap: 0.35rem; align-items: stretch; }
+  .shelf-continue-btn {
+    background: rgba(201,168,76,0.15);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    padding: 0.4rem 0.65rem;
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border-radius: 1px;
+    white-space: nowrap;
+  }
+  .shelf-continue-btn:hover { background: rgba(201,168,76,0.28); }
+  .taste-profiles { margin: 1rem 0 0.5rem; }
+  .taste-profiles-label { font-size: 0.78rem; color: var(--gold-dim); margin-bottom: 0.5rem; }
+  .profile-options { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .profile-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--parchment);
+    padding: 0.4rem 0.65rem;
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border-radius: 1px;
+  }
+  .profile-btn:hover, .profile-btn.selected { border-color: var(--gold); color: var(--gold); background: var(--surface-hover); }
+  .theme-toggle-global {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--gold);
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 1px;
+    flex-shrink: 0;
+  }
+  .theme-toggle-global:hover { border-color: var(--gold); background: var(--surface-hover); }
+  .app-banner, .offline-banner, .update-banner {
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 0.55rem 1rem;
+    font-size: 0.8rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    text-align: center;
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .offline-banner {
+    top: 0;
+    display: none;
+    background: var(--banner-bg);
+    color: var(--banner-text);
+  }
+  body.has-offline-banner .screen.active { padding-top: 2.5rem; }
+  .update-banner {
+    bottom: 0;
+    background: var(--gold);
+    color: var(--ink);
+  }
+  .app-banner {
+    bottom: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    color: var(--parchment);
+  }
+  body.has-app-banner .screen.active { padding-bottom: 3rem; }
+  body.has-update-banner .screen.active { padding-bottom: 3rem; }
+  .banner-btn {
+    background: var(--ink);
+    color: var(--parchment);
+    border: none;
+    padding: 0.35rem 0.85rem;
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    border-radius: 1px;
+  }
+  .update-banner .banner-btn { background: var(--ink); color: var(--parchment); }
+  .app-banner .banner-btn { background: var(--gold); color: var(--ink); }
+  .banner-dismiss {
+    background: transparent;
+    border: none;
+    color: inherit;
+    opacity: 0.7;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0 0.25rem;
+  }
+  body.reading-immersive #reading-screen .reading-header,
+  body.reading-immersive #reading-screen .reading-chapter-nav {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  body.reading-immersive #reading-screen:hover .reading-header,
+  body.reading-immersive #reading-screen:hover .reading-chapter-nav,
+  body.reading-immersive #reading-screen:focus-within .reading-header,
+  body.reading-immersive #reading-screen:focus-within .reading-chapter-nav {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .read-tool-btn.immersive-on { background: rgba(201,168,76,0.25); border-color: var(--gold); }
 
   .reading-toolbar {
     display: flex;
@@ -1188,9 +1365,9 @@
 
   /* Error */
   .error-msg {
-    background: rgba(122,59,30,0.2);
-    border: 1px solid rgba(122,59,30,0.4);
-    color: #e8a87c;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    color: var(--error-text);
     padding: 1rem;
     border-radius: 1px;
     font-size: 0.85rem;
@@ -1215,7 +1392,21 @@
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
-<body>
+<body class="theme-dark">
+
+<div id="offline-banner" class="offline-banner" role="status">
+  <span>אין חיבור רשת — קריאה מהמדף זמינה; יצירת פרקים חדשים דורשת אינטרנט.</span>
+</div>
+<div id="update-banner" class="update-banner" role="alert">
+  <span>גרסה חדשה של האפליקציה מוכנה</span>
+  <button type="button" class="banner-btn" onclick="applyAppUpdate()">רענן עכשיו</button>
+  <button type="button" class="banner-dismiss" onclick="dismissUpdateBanner()" aria-label="סגור">✕</button>
+</div>
+<div id="app-install-banner" class="app-banner" role="dialog" aria-label="התקנת אפליקציה">
+  <span>📲 התקן את ספריית הנצח על המסך הראשי</span>
+  <button type="button" class="banner-btn" onclick="promptPwaInstall()">התקן</button>
+  <button type="button" class="banner-dismiss" onclick="dismissInstallBanner()" aria-label="סגור">✕</button>
+</div>
 
 <!-- WELCOME SCREEN -->
 <div id="welcome-screen" class="screen active">
@@ -1228,6 +1419,11 @@
   <div class="welcome-card">
     <h2>ספר חדש מחכה לך</h2>
     <p>בחר אורך, לחץ "פתח ספר" — והתחל לקרוא. העולם והפרקים נבנים מאחורי הקלעים.</p>
+
+    <div class="taste-profiles">
+      <div class="taste-profiles-label">פרופיל קריאה (שמירה אוטומטית)</div>
+      <div class="profile-options" id="profile-options"></div>
+    </div>
 
     <p style="font-size:0.8rem;color:var(--gold-dim);margin-bottom:0.5rem">איזה סוג הרפתקה?</p>
     <div class="taste-options" id="taste-options">
@@ -1275,6 +1471,7 @@
 
     <button class="create-btn" id="create-btn" onclick="startBookCreation()">✦ פתח ספר חדש ✦</button>
     <button type="button" class="taste-btn" style="width:100%;margin-top:0.75rem" onclick="startRandomBook()">🎲 ספר אקראי — הפתע אותי</button>
+    <button type="button" id="pwa-install-btn" class="taste-btn" style="width:100%;margin-top:0.5rem;display:none" onclick="promptPwaInstall()">📲 התקן כאפליקציה</button>
     <div class="welcome-links" id="welcome-shelf-link" style="display:none">
       <button type="button" onclick="showShelf()">← חזרה למדף הספרים</button>
     </div>
@@ -1286,11 +1483,34 @@
 <div id="shelf-screen" class="screen">
   <div class="shelf-header">
     <div class="title" style="font-family:'Frank Ruhl Libre',serif;font-size:1.4rem;color:var(--gold)">📚 המדף שלי</div>
+    <button type="button" class="theme-toggle-global" id="theme-toggle-shelf" onclick="toggleTheme()" title="מצב בהיר/כהה">☀</button>
     <button class="new-book-btn" onclick="openWelcomeApiSettings()">🔑 מפתח API</button>
     <button class="new-book-btn" onclick="openWelcomeNewBook()">+ ספר חדש</button>
   </div>
   <div class="shelf-body">
+    <div class="shelf-toolbar">
+      <label>סינון</label>
+      <select id="shelf-filter" onchange="onShelfFilterChange(this.value)">
+        <option value="all">הכל</option>
+        <option value="reading">בקריאה</option>
+        <option value="complete">הושלמו</option>
+        <option value="series">סדרות</option>
+      </select>
+      <label>מיון</label>
+      <select id="shelf-sort" onchange="onShelfSortChange(this.value)">
+        <option value="recent">חדש → ישן</option>
+        <option value="rating">דירוג גבוה</option>
+        <option value="title">שם א׳→ת׳</option>
+      </select>
+    </div>
     <div class="shelf-grid" id="shelf-grid"></div>
+    <div class="library-actions" style="margin-top:1.5rem">
+      <button type="button" class="secondary-btn" onclick="exportLibraryJson()">📂 גיבוי המדף (JSON)</button>
+      <label class="secondary-btn" style="cursor:pointer;margin:0">
+        📥 שחזור מדף
+        <input type="file" accept="application/json,.json" style="display:none" onchange="onImportLibraryFile(event)">
+      </label>
+    </div>
   </div>
 </div>
 
@@ -1339,6 +1559,7 @@
   <div class="library-header">
     <div class="title">📖 ספריית הנצח</div>
     <div class="book-title-display" id="header-book-title"></div>
+    <button type="button" class="theme-toggle-global" id="theme-toggle-library" onclick="toggleTheme()" title="מצב בהיר/כהה">☀</button>
     <button class="new-book-btn" onclick="showShelf()">מדף ספרים</button>
     <button class="new-book-btn" onclick="openWelcomeNewBook()">+ חדש</button>
   </div>
@@ -1391,7 +1612,9 @@
     <div class="reading-toolbar">
       <button type="button" class="read-tool-btn" onclick="adjustFontSize(-0.08)" title="הקטן">A−</button>
       <button type="button" class="read-tool-btn" onclick="adjustFontSize(0.08)" title="הגדל">A+</button>
-      <button type="button" class="read-tool-btn" onclick="toggleTheme()" title="מצב קריאה" id="theme-toggle-btn">☀</button>
+      <button type="button" class="read-tool-btn" onclick="toggleTheme()" title="מצב בהיר/כהה" id="theme-toggle-btn">☀</button>
+      <button type="button" class="read-tool-btn" id="immersive-toggle-btn" onclick="toggleReadingImmersive()" title="מצב קריאה מלאה">⛶</button>
+      <button type="button" class="read-tool-btn" id="wake-toggle-btn" onclick="toggleWakeLock()" title="מנע נעילת מסך">💡</button>
     </div>
   </div>
 
@@ -1440,11 +1663,25 @@ const TASTES = {
   'character': 'דגש על דמויות, יחסים, קונפליקטים רגשיים, וצמיחה אישית'
 };
 
-let app = { apiKey: '', currentBookId: null, books: {}, readingPrefs: { fontScale: 1, theme: 'dark' } };
+let app = { apiKey: '', currentBookId: null, books: {}, readingPrefs: { fontScale: 1, theme: 'dark', immersive: false } };
 let state = createEmptyBookState();
 let selectedTaste = 'hard-magic';
 let pendingSequelSourceId = null;
 let pendingSequelLength = 15;
+let deferredInstallPrompt = null;
+let waitingSwWorker = null;
+let wakeLock = null;
+let shelfFilter = 'all';
+let shelfSort = 'recent';
+const chapterGenQueue = [];
+let chapterGenPumpActive = false;
+
+const DEFAULT_TASTE_PROFILES = [
+  { id: 'epic', name: 'אפי ארוך', taste: 'war', length: 50 },
+  { id: 'classic', name: 'קלאסי', taste: 'hard-magic', length: 30 },
+  { id: 'mystery', name: 'מסתורין', taste: 'mystery', length: 30 },
+  { id: 'quick', name: 'קריאה מהירה', taste: 'character', length: 15 }
+];
 
 function createEmptyBookState() {
   return {
@@ -1466,7 +1703,8 @@ function createEmptyBookState() {
     seriesTitle: '',
     sequelIndex: 1,
     rating: 0,
-    expandChapterList: false
+    expandChapterList: false,
+    lastReadScroll: 0
   };
 }
 
@@ -1490,7 +1728,8 @@ function bookSnapshot() {
     seriesTitle: state.seriesTitle || state.book?.title || '',
     sequelIndex: state.sequelIndex || 1,
     rating: state.rating || 0,
-    expandChapterList: !!state.expandChapterList
+    expandChapterList: !!state.expandChapterList,
+    lastReadScroll: state.lastReadScroll || 0
   };
 }
 
@@ -1761,7 +2000,8 @@ function load() {
     } else {
       app = JSON.parse(raw);
       if (!app.books) app.books = {};
-      if (!app.readingPrefs) app.readingPrefs = { fontScale: 1, theme: 'dark' };
+      if (!app.readingPrefs) app.readingPrefs = { fontScale: 1, theme: 'dark', immersive: false };
+      if (!app.tasteProfiles?.length) app.tasteProfiles = DEFAULT_TASTE_PROFILES.map(p => ({ ...p }));
     }
     const ids = Object.keys(app.books);
     if (app.currentBookId && app.books[app.currentBookId]) {
@@ -1774,6 +2014,12 @@ function load() {
       state.apiKey = app.apiKey || '';
     }
     state.apiKey = app.apiKey || state.apiKey || '';
+    if (!app.readingPrefs?.theme) {
+      const prefersLight = window.matchMedia?.('(prefers-color-scheme: light)').matches;
+      app.readingPrefs = app.readingPrefs || { fontScale: 1, immersive: false };
+      app.readingPrefs.theme = prefersLight ? 'light' : 'dark';
+    }
+    if (!app.tasteProfiles?.length) app.tasteProfiles = DEFAULT_TASTE_PROFILES.map(p => ({ ...p }));
     if (state.writing) { state.writing = false; save(); }
   } catch(e) {
     state = createEmptyBookState();
@@ -1806,11 +2052,21 @@ ${state.eventLog.join('\n\n')}`;
 }
 
 function applyReadingPrefs() {
-  const p = app.readingPrefs || { fontScale: 1, theme: 'dark' };
+  const p = app.readingPrefs || { fontScale: 1, theme: 'dark', immersive: false };
   document.documentElement.style.setProperty('--read-font-scale', String(p.fontScale || 1));
-  document.body.classList.toggle('theme-light', p.theme === 'light');
-  const tb = document.getElementById('theme-toggle-btn');
-  if (tb) tb.textContent = p.theme === 'light' ? '☾' : '☀';
+  const isLight = p.theme === 'light';
+  document.body.classList.toggle('theme-light', isLight);
+  document.body.classList.toggle('theme-dark', !isLight);
+  document.body.classList.toggle('reading-immersive', !!p.immersive && isReadingScreenActive());
+  const themeIcon = isLight ? '☾' : '☀';
+  ['theme-toggle-btn', 'theme-toggle-shelf', 'theme-toggle-library'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = themeIcon;
+  });
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = isLight ? '#ebe4d4' : '#1a1410';
+  const imm = document.getElementById('immersive-toggle-btn');
+  if (imm) imm.classList.toggle('immersive-on', !!p.immersive);
 }
 
 function adjustFontSize(delta) {
@@ -1825,10 +2081,236 @@ function toggleTheme() {
   save();
 }
 
+function toggleReadingImmersive() {
+  app.readingPrefs.immersive = !app.readingPrefs.immersive;
+  applyReadingPrefs();
+  save();
+}
+
+async function toggleWakeLock() {
+  try {
+    if (!('wakeLock' in navigator)) {
+      alert('הדפדפן לא תומך במניעת נעילת מסך');
+      return;
+    }
+    if (wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    } else {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => updateWakeLockButton(false));
+    }
+    updateWakeLockButton(!!wakeLock);
+  } catch (e) {
+    console.warn('WakeLock', e);
+  }
+}
+
+function updateWakeLockButton(on) {
+  const btn = document.getElementById('wake-toggle-btn');
+  if (!btn) return;
+  btn.textContent = on ? '💤' : '💡';
+  btn.title = on ? 'בטל מניעת נעילה' : 'מנע נעילת מסך';
+}
+
+async function releaseWakeLock() {
+  if (wakeLock) {
+    try { await wakeLock.release(); } catch (e) {}
+    wakeLock = null;
+    updateWakeLockButton(false);
+  }
+}
+
+function getTasteProfiles() {
+  if (!app.tasteProfiles?.length) app.tasteProfiles = DEFAULT_TASTE_PROFILES.map(p => ({ ...p }));
+  return app.tasteProfiles;
+}
+
+function renderTasteProfiles() {
+  const wrap = document.getElementById('profile-options');
+  if (!wrap) return;
+  const active = app.readingPrefs?.activeProfile || 'classic';
+  wrap.innerHTML = '';
+  getTasteProfiles().forEach(p => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'profile-btn' + (p.id === active ? ' selected' : '');
+    btn.textContent = `${p.name} · ${p.length} פרקים`;
+    btn.onclick = () => applyTasteProfile(p.id);
+    wrap.appendChild(btn);
+  });
+}
+
+function applyTasteProfile(profileId) {
+  const p = getTasteProfiles().find(x => x.id === profileId);
+  if (!p) return;
+  app.readingPrefs.activeProfile = profileId;
+  app.readingPrefs.defaultTaste = p.taste;
+  app.readingPrefs.defaultLength = p.length;
+  selectedTaste = p.taste;
+  state.totalChapters = p.length;
+  document.querySelectorAll('#taste-options .taste-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.taste === p.taste);
+  });
+  document.querySelectorAll('#welcome-screen .length-btn').forEach(b => {
+    const n = parseInt(b.querySelector('.chapters-count')?.textContent, 10);
+    b.classList.toggle('selected', n === p.length);
+  });
+  renderTasteProfiles();
+  save();
+}
+
 function selectTaste(btn, taste) {
-  document.querySelectorAll('.taste-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('#taste-options .taste-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   selectedTaste = taste;
+  app.readingPrefs.defaultTaste = taste;
+  save();
+}
+
+function updateOfflineBanner() {
+  const banner = document.getElementById('offline-banner');
+  const online = navigator.onLine;
+  if (banner) banner.style.display = online ? 'none' : 'flex';
+  document.body.classList.toggle('has-offline-banner', !online);
+}
+
+function showInstallUi() {
+  const banner = document.getElementById('app-install-banner');
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.style.display = 'block';
+  if (banner && !localStorage.getItem('pwa-install-dismissed')) {
+    banner.style.display = 'flex';
+    document.body.classList.add('has-app-banner');
+  }
+}
+
+function dismissInstallBanner() {
+  localStorage.setItem('pwa-install-dismissed', '1');
+  const banner = document.getElementById('app-install-banner');
+  if (banner) banner.style.display = 'none';
+  document.body.classList.remove('has-app-banner');
+}
+
+async function promptPwaInstall() {
+  if (!deferredInstallPrompt) return;
+  const ev = deferredInstallPrompt;
+  deferredInstallPrompt = null;
+  dismissInstallBanner();
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.style.display = 'none';
+  await ev.prompt();
+  await ev.userChoice;
+}
+
+function showUpdateBanner(worker) {
+  waitingSwWorker = worker;
+  const banner = document.getElementById('update-banner');
+  if (banner) {
+    banner.style.display = 'flex';
+    document.body.classList.add('has-update-banner');
+  }
+}
+
+function dismissUpdateBanner() {
+  const banner = document.getElementById('update-banner');
+  if (banner) banner.style.display = 'none';
+  document.body.classList.remove('has-update-banner');
+}
+
+function applyAppUpdate() {
+  if (waitingSwWorker) {
+    waitingSwWorker.postMessage({ type: 'SKIP_WAITING' });
+    return;
+  }
+  window.location.reload();
+}
+
+async function exportLibraryJson() {
+  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+  const data = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    apiKey: app.apiKey || '',
+    readingPrefs: app.readingPrefs,
+    tasteProfiles: app.tasteProfiles,
+    books: app.books || {}
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'seferiyat-hanetzach-shelf.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function onImportLibraryFile(ev) {
+  const file = ev.target.files?.[0];
+  ev.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data?.books || typeof data.books !== 'object') throw new Error('קובץ לא תקין');
+      if (!confirm('לשחזר את המדף מהקובץ? ספרים קיימים יוחלפו.')) return;
+      app.books = data.books;
+      if (data.apiKey) app.apiKey = data.apiKey;
+      if (data.readingPrefs) app.readingPrefs = { ...app.readingPrefs, ...data.readingPrefs };
+      if (data.tasteProfiles?.length) app.tasteProfiles = data.tasteProfiles;
+      const ids = Object.keys(app.books);
+      if (ids.length) {
+        applyBookSnapshot(app.books[ids[ids.length - 1]]);
+        app.currentBookId = state.id;
+      } else {
+        state = createEmptyBookState();
+        state.apiKey = app.apiKey;
+        app.currentBookId = null;
+      }
+      save();
+      applyReadingPrefs();
+      renderTasteProfiles();
+      renderShelf();
+      updateWelcomeShelfLink();
+      alert('המדף שוחזר בהצלחה');
+    } catch (e) {
+      alert('שגיאה בטעינת גיבוי: ' + e.message);
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function onShelfFilterChange(v) { shelfFilter = v; renderShelf(); }
+function onShelfSortChange(v) { shelfSort = v; renderShelf(); }
+
+function shelfBookMatchesFilter(b) {
+  const written = b.chapters?.length || 0;
+  const total = b.totalChapters || 0;
+  if (shelfFilter === 'complete') return isBookComplete(b);
+  if (shelfFilter === 'reading') return written > 0 && !isBookComplete(b);
+  if (shelfFilter === 'series') return (b.sequelIndex || 1) > 1 || !!b.parentBookId;
+  return true;
+}
+
+function sortShelfIds(ids) {
+  return ids.sort((a, b) => {
+    const ba = app.books[a], bb = app.books[b];
+    if (shelfSort === 'rating') return (bb.rating || 0) - (ba.rating || 0);
+    if (shelfSort === 'title') {
+      return (ba.book?.title || '').localeCompare(bb.book?.title || '', 'he');
+    }
+    return (bb.createdAt || 0) - (ba.createdAt || 0);
+  });
+}
+
+function getContinueChapterIndex(b) {
+  const written = b.chapters?.length || 0;
+  if (!written) return -1;
+  const last = b.lastReadChapter ?? 0;
+  if (last + 1 < written) return last + 1;
+  if (last < written) return last;
+  return written - 1;
 }
 
 function shelfCount() {
@@ -1840,10 +2322,20 @@ const TASTE_LABELS = { 'hard-magic': 'קסם קשה', mystery: 'מסתורין',
 function renderShelf() {
   const grid = document.getElementById('shelf-grid');
   if (!grid) return;
-  const ids = Object.keys(app.books).sort((a, b) =>
-    (app.books[b].createdAt || 0) - (app.books[a].createdAt || 0));
-  if (!ids.length) {
+  const filterEl = document.getElementById('shelf-filter');
+  const sortEl = document.getElementById('shelf-sort');
+  if (filterEl) filterEl.value = shelfFilter;
+  if (sortEl) sortEl.value = shelfSort;
+
+  let ids = Object.keys(app.books).filter(id => shelfBookMatchesFilter(app.books[id]));
+  ids = sortShelfIds(ids);
+
+  if (!Object.keys(app.books).length) {
     grid.innerHTML = '<div class="shelf-empty">אין ספרים במדף — פתח ספר חדש להתחיל</div>';
+    return;
+  }
+  if (!ids.length) {
+    grid.innerHTML = '<div class="shelf-empty">אין ספרים בסינון זה — נסה סינון אחר</div>';
     return;
   }
   grid.innerHTML = '';
@@ -1851,18 +2343,48 @@ function renderShelf() {
     const b = app.books[id];
     const written = b.chapters?.length || 0;
     const total = b.totalChapters || 0;
-    const card = document.createElement('button');
+    const continueIdx = getContinueChapterIndex(b);
+    const canContinue = continueIdx >= 0;
+    const pct = total > 0 ? Math.round((written / total) * 100) : 0;
+    const stars = b.rating ? '★'.repeat(b.rating) : '';
+
+    const card = document.createElement('div');
     card.className = 'shelf-card';
     card.innerHTML = `
-      <div style="flex:1">
-        <div class="shelf-card-title">${b.book?.title || 'ספר ללא שם'}</div>
-        <div class="shelf-card-meta">${written} / ${total} פרקים${isBookComplete(b) ? ' · הושלם' : ''}${b.sequelIndex > 1 ? ` · ספר ${b.sequelIndex}` : ''} · ${TASTE_LABELS[b.taste] || 'פנטזיה'}</div>
-      </div>
-      <span style="color:var(--gold);font-size:1.2rem">📖</span>
-      <button type="button" class="read-tool-btn" title="מחק" onclick="deleteBookFromShelf('${id}', event)">✕</button>`;
-    card.onclick = () => openBookFromShelf(id);
+      <button type="button" class="shelf-card-main" style="flex:1;background:none;border:none;color:inherit;text-align:right;cursor:pointer;font:inherit;padding:0">
+        <div class="shelf-card-title">${escapeHtml(b.book?.title || 'ספר ללא שם')}</div>
+        <div class="shelf-card-meta">
+          <span class="meta-pill">${written}/${total} · ${pct}%</span>
+          ${isBookComplete(b) ? '<span class="meta-pill meta-done">הושלם</span>' : written ? '<span class="meta-pill">בתהליך</span>' : '<span class="meta-pill">חדש</span>'}
+          ${(b.sequelIndex || 1) > 1 || b.parentBookId ? `<span class="meta-pill meta-series">סדרה ${b.sequelIndex || 1}</span>` : ''}
+          <span class="meta-pill">${TASTE_LABELS[b.taste] || 'פנטזיה'}</span>
+          ${stars ? `<span class="meta-pill">${stars}</span>` : ''}
+        </div>
+        ${canContinue ? `<div style="font-size:0.78rem;color:var(--gold);margin-top:0.35rem">↪ המשך מפרק ${continueIdx + 1}</div>` : ''}
+      </button>
+      <div class="shelf-card-actions">
+        ${canContinue ? `<button type="button" class="shelf-continue-btn" data-continue="${id}">המשך קריאה</button>` : ''}
+        <button type="button" class="read-tool-btn" title="מחק" data-delete="${id}">✕</button>
+      </div>`;
+
+    card.querySelector('.shelf-card-main').onclick = () => openBookFromShelf(id);
+    const cont = card.querySelector('[data-continue]');
+    if (cont) cont.onclick = (e) => continueBookFromShelf(id, e);
+    card.querySelector('[data-delete]').onclick = (e) => deleteBookFromShelf(id, e);
     grid.appendChild(card);
   });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function continueBookFromShelf(id, ev) {
+  if (ev) ev.stopPropagation();
+  openBookFromShelf(id);
+  const b = app.books[id];
+  const idx = getContinueChapterIndex(b);
+  if (idx >= 0) openChapter(idx);
 }
 
 function openBookFromShelf(id) {
@@ -2048,9 +2570,15 @@ ${fmt(mb.openMysteries, m => `- ${m.question} [${m.status || 'פתוח'}, מפר
 
 // ===== SCREEN MANAGEMENT =====
 function showScreen(id) {
+  if (id !== 'reading-screen') {
+    releaseWakeLock();
+    if (app.readingPrefs) app.readingPrefs.immersive = false;
+    document.body.classList.remove('reading-immersive');
+  }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   window.scrollTo(0, 0);
+  applyReadingPrefs();
 }
 
 function showLibrary() {
@@ -2061,9 +2589,34 @@ function showLibrary() {
 
 // ===== LENGTH SELECTION =====
 function selectLength(btn, n) {
-  document.querySelectorAll('.length-btn').forEach(b => b.classList.remove('selected'));
+  const scope = btn.closest('#welcome-screen') || btn.closest('#sequel-screen');
+  if (scope) scope.querySelectorAll('.length-btn').forEach(b => b.classList.remove('selected'));
+  else document.querySelectorAll('.length-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   state.totalChapters = n;
+  if (btn.closest('#welcome-screen')) {
+    app.readingPrefs.defaultLength = n;
+    save();
+  }
+}
+
+function applyWelcomeDefaults() {
+  const p = app.readingPrefs || {};
+  if (p.activeProfile) applyTasteProfile(p.activeProfile);
+  else {
+    if (p.defaultTaste) {
+      selectedTaste = p.defaultTaste;
+      document.querySelectorAll('#taste-options .taste-btn').forEach(b => {
+        b.classList.toggle('selected', b.dataset.taste === p.defaultTaste);
+      });
+    }
+    const len = p.defaultLength || 15;
+    state.totalChapters = len;
+    document.querySelectorAll('#welcome-screen .length-btn').forEach(b => {
+      const n = parseInt(b.querySelector('.chapters-count')?.textContent, 10);
+      b.classList.toggle('selected', n === len);
+    });
+  }
 }
 
 // ===== API CALL =====
@@ -2152,6 +2705,10 @@ function mergeContinuation(existing, continuation) {
 
 // ===== BOOK CREATION =====
 async function startBookCreation() {
+  if (!navigator.onLine) {
+    showError('welcome-error', 'אין חיבור רשת — יצירת ספר חדש דורשת אינטרנט. אפשר לקרוא ספרים שכבר במדף.');
+    return;
+  }
   const apiKey = getStoredApiKey();
   if (!apiKey) {
     const details = document.getElementById('api-settings-details');
@@ -2455,7 +3012,52 @@ async function startSequelBook(sourceId, chapterCount) {
 }
 
 // ===== CHAPTER PIPELINE (מאחורי הקלעים) =====
-async function generateChapterAt(idx, { background = false, openAfter = false, useLoadingScreen = false } = {}) {
+function requestChapterGeneration(idx, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const dup = chapterGenQueue.find(j => j.idx === idx);
+    if (dup) {
+      dup.resolves.push(resolve);
+      dup.rejects.push(reject);
+      pumpChapterGenQueue();
+      return;
+    }
+    chapterGenQueue.push({ idx, opts, resolves: [resolve], rejects: [reject] });
+    pumpChapterGenQueue();
+  });
+}
+
+async function pumpChapterGenQueue() {
+  if (chapterGenPumpActive) return;
+  chapterGenPumpActive = true;
+  try {
+    while (chapterGenQueue.length) {
+      const job = chapterGenQueue[0];
+      if (state.writing && state.generatingIdx !== job.idx) {
+        await waitForGeneration();
+        continue;
+      }
+      try {
+        await runGenerateChapterAt(job.idx, job.opts);
+        job.resolves.forEach(r => r());
+      } catch (e) {
+        job.rejects.forEach(r => r(e));
+      }
+      chapterGenQueue.shift();
+    }
+  } finally {
+    chapterGenPumpActive = false;
+    if (chapterGenQueue.length) pumpChapterGenQueue();
+  }
+}
+
+async function generateChapterAt(idx, opts = {}) {
+  return requestChapterGeneration(idx, opts);
+}
+
+async function runGenerateChapterAt(idx, { background = false, openAfter = false, useLoadingScreen = false } = {}) {
+  if (!navigator.onLine) {
+    throw new Error('אין חיבור רשת — לא ניתן ליצור פרק חדש');
+  }
   if (!state.book || idx >= state.totalChapters) return;
   if (idx < state.chapters.length) {
     if (openAfter) openChapter(idx);
@@ -2552,6 +3154,7 @@ function prefetchChapter(idx) {
 }
 
 async function readNextChapter() {
+  if (state.writing) await waitForGeneration();
   const written = state.chapters.length;
   if (written === 0) {
     try { await generateChapterAt(0, { openAfter: true }); } catch(e) {}
@@ -3022,7 +3625,11 @@ function renderLibrary() {
   } else {
     writeBtn.style.display = 'flex';
     writeBtn.disabled = state.writing;
-    writeBtn.textContent = writtenCount === 0 ? '📖 התחל לקרוא' : '📖 המשך לקרוא';
+    const last = state.lastReadChapter ?? -1;
+    const hasUnread = last + 1 < writtenCount;
+    if (writtenCount === 0) writeBtn.textContent = '📖 התחל לקרוא';
+    else if (hasUnread) writeBtn.textContent = `↪ המשך מפרק ${last + 2}`;
+    else writeBtn.textContent = '📖 המשך לקרוא';
   }
 
   renderLibraryActions();
@@ -3121,6 +3728,15 @@ function openChapter(idx) {
   state.lastReadChapter = idx;
   save();
 
+  applyReadingPrefs();
+  if ('wakeLock' in navigator && !wakeLock) {
+    navigator.wakeLock.request('screen').then(wl => {
+      wakeLock = wl;
+      wl.addEventListener('release', () => { wakeLock = null; updateWakeLockButton(false); });
+      updateWakeLockButton(true);
+    }).catch(() => {});
+  }
+
   document.getElementById('reading-chapter-label').textContent = `פרק ${chapter.number} מתוך ${state.totalChapters}`;
   document.getElementById('reading-chapter-num').textContent = `פרק ${chapter.number}`;
   document.getElementById('reading-chapter-title').textContent = chapter.title;
@@ -3185,7 +3801,22 @@ function openChapter(idx) {
   closeChapterDrawer();
   renderReadingNav(idx);
   showScreen('reading-screen');
-  window.scrollTo(0, 0);
+  const scrollY = (state.lastReadChapter === idx && state.lastReadScroll) ? state.lastReadScroll : 0;
+  window.scrollTo(0, scrollY);
+
+  let scrollSaveTimer;
+  const onScroll = () => {
+    clearTimeout(scrollSaveTimer);
+    scrollSaveTimer = setTimeout(() => {
+      if (state.currentReadingChapter === idx) {
+        state.lastReadScroll = window.scrollY;
+        save();
+      }
+    }, 300);
+  };
+  window.removeEventListener('scroll', openChapter._scrollHandler);
+  openChapter._scrollHandler = onScroll;
+  window.addEventListener('scroll', onScroll, { passive: true });
 
   prefetchChapter(idx + 1);
 }
@@ -3219,7 +3850,26 @@ function deleteBookFromShelf(id, ev) {
 // ===== INIT =====
 load();
 applyReadingPrefs();
+applyWelcomeDefaults();
+renderTasteProfiles();
 updateWelcomeShelfLink();
+updateOfflineBanner();
+window.addEventListener('online', updateOfflineBanner);
+window.addEventListener('offline', updateOfflineBanner);
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  showInstallUi();
+});
+window.addEventListener('appinstalled', () => {
+  dismissInstallBanner();
+  deferredInstallPrompt = null;
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibility === 'visible' && isReadingScreenActive() && app.readingPrefs?.immersive === false) {
+    releaseWakeLock();
+  }
+});
 
 if (app.apiKey || state.apiKey) {
   const keyInput = document.getElementById('api-key-input');
@@ -3248,8 +3898,24 @@ document.addEventListener('keydown', e => {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(err => {
-      console.warn('Service worker registration failed:', err);
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      if (reg.waiting) showUpdateBanner(reg.waiting);
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateBanner(nw);
+          }
+        });
+      });
+    }).catch(err => console.warn('Service worker registration failed:', err));
+
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
     });
   });
 }

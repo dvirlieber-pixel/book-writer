@@ -38,5 +38,21 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "screenshots": [
+    {
+      "src": "./icons/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "\u05e1\u05e4\u05e8\u05d9\u05d9\u05ea \u05d4\u05e0\u05e6\u05d7 \u2014 \u05de\u05e1\u05da \u05d4\u05de\u05d3\u05e3"
+    },
+    {
+      "src": "./icons/screenshot-narrow.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "\u05e7\u05e8\u05d9\u05d0\u05ea \u05e1\u05e4\u05e8 \u05d1\u05de\u05db\u05e9\u05d9\u05e8"
+    }
   ]
 }
