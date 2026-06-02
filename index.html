@@ -621,6 +621,53 @@
   }
   .api-show-key-btn:hover { border-color: var(--gold); color: var(--gold); }
 
+  .library-actions, .book-complete-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+  .secondary-btn {
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.35);
+    color: var(--gold);
+    padding: 0.65rem 1rem;
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 1px;
+  }
+  .secondary-btn:hover { background: rgba(201,168,76,0.18); }
+  .book-complete-actions {
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem;
+    margin-top: 1rem;
+    border: 1px solid rgba(201,168,76,0.25);
+    background: rgba(201,168,76,0.05);
+  }
+  .book-complete-actions h3 {
+    font-family: 'Frank Ruhl Libre', serif;
+    color: var(--gold);
+    margin-bottom: 0.5rem;
+  }
+  .complete-btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+  .rating-row {
+    display: flex;
+    gap: 0.35rem;
+    margin: 0.75rem 0;
+  }
+  .rating-star {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    opacity: 0.35;
+    filter: grayscale(1);
+  }
+  .rating-star.on { opacity: 1; filter: none; }
+
   .taste-options {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -957,6 +1004,7 @@
     .welcome-card { padding: 1.5rem; }
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
@@ -1080,6 +1128,7 @@
       <span class="dot-anim"><span>•</span><span>•</span><span>•</span></span>
       <span id="writing-status-text">מכין את הפרק...</span>
     </div>
+    <div class="library-actions" id="library-actions"></div>
     <div id="library-error" class="error-msg" style="display:none"></div>
   </div>
 </div>
@@ -1145,7 +1194,11 @@ function createEmptyBookState() {
     generatingIdx: null,
     lastReadChapter: 0,
     currentReadingChapter: 0,
-    createdAt: null
+    createdAt: null,
+    parentBookId: null,
+    seriesTitle: '',
+    sequelIndex: 1,
+    rating: 0
   };
 }
 
@@ -1164,8 +1217,236 @@ function bookSnapshot() {
     storySynopsis: state.storySynopsis || '',
     memoryBook: state.memoryBook,
     lastReadChapter: state.lastReadChapter,
-    createdAt: state.createdAt || Date.now()
+    createdAt: state.createdAt || Date.now(),
+    parentBookId: state.parentBookId || null,
+    seriesTitle: state.seriesTitle || state.book?.title || '',
+    sequelIndex: state.sequelIndex || 1,
+    rating: state.rating || 0
   };
+}
+
+function deepClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function isBookComplete(snap) {
+  const s = snap || bookSnapshot();
+  return s.book && s.chapters?.length >= s.totalChapters;
+}
+
+function sanitizeFilename(name) {
+  return (name || 'ספר').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim().slice(0, 80) || 'ספר';
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function escapeXml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function proseToXhtml(text) {
+  return text.split(/\n+/).map(p => p.trim()).filter(Boolean).map(p => {
+    if (p === '[***]' || p === '* * *') return '<hr/>';
+    return `<p>${escapeXml(p)}</p>`;
+  }).join('\n    ');
+}
+
+function exportBookHtml() {
+  if (!state.chapters.length) {
+    alert('אין פרקים לייצוא עדיין');
+    return;
+  }
+  const title = state.book?.title || 'ספר';
+  const complete = state.chapters.length >= state.totalChapters;
+  const chaptersHtml = state.chapters.map(ch => `
+    <section class="chapter">
+      <h2>פרק ${ch.number}: ${escapeXml(ch.title)}</h2>
+      ${proseToXhtml(ch.text)}
+    </section>`).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<title>${escapeXml(title)}</title>
+<style>
+  body { font-family: Georgia, 'Noto Serif Hebrew', serif; max-width: 40em; margin: 2rem auto; padding: 0 1rem; line-height: 1.8; }
+  h1 { text-align: center; }
+  h2 { margin-top: 2.5rem; color: #333; }
+  p { text-indent: 1.5em; margin: 0 0 1em; }
+  hr { border: none; text-align: center; margin: 2rem 0; }
+  hr::before { content: "✦ ✦ ✦"; letter-spacing: 0.5em; color: #999; }
+</style>
+</head>
+<body>
+<h1>${escapeXml(title)}</h1>
+<p style="text-align:center;color:#666">${escapeXml(state.book?.tagline || '')}</p>
+${!complete ? '<p style="text-align:center;color:#a66"><em>ייצוא חלקי — הספר עדיין בהמשך</em></p>' : ''}
+${chaptersHtml}
+</body>
+</html>`;
+
+  downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), sanitizeFilename(title) + '.html');
+}
+
+async function exportBookEpub() {
+  if (!state.chapters.length) {
+    alert('אין פרקים לייצוא עדיין');
+    return;
+  }
+  if (typeof JSZip === 'undefined') {
+    alert('ספריית EPUB לא נטענה — מוריד HTML במקום');
+    exportBookHtml();
+    return;
+  }
+
+  const zip = new JSZip();
+  const title = state.book?.title || 'ספר';
+  const uid = 'urn:uuid:' + (state.id || newBookId());
+  const date = new Date().toISOString().slice(0, 10);
+
+  zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
+  zip.folder('META-INF').file('container.xml', `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`);
+
+  const oebps = zip.folder('OEBPS');
+  const chapterMeta = [];
+
+  state.chapters.forEach((ch, i) => {
+    const id = `ch${i + 1}`;
+    const href = `${id}.xhtml`;
+    const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="he" dir="rtl">
+<head>
+  <title>${escapeXml(ch.title)}</title>
+  <meta charset="UTF-8"/>
+  <style>p { text-indent: 1.2em; margin: 0 0 0.9em; } hr { border: none; margin: 1.5em 0; }</style>
+</head>
+<body>
+  <h1>פרק ${ch.number}: ${escapeXml(ch.title)}</h1>
+  ${proseToXhtml(ch.text)}
+</body>
+</html>`;
+    oebps.file(href, xhtml);
+    chapterMeta.push({ id, href, title: `פרק ${ch.number}: ${ch.title}` });
+  });
+
+  const navLi = chapterMeta.map(c =>
+    `<li><a href="${c.href}">${escapeXml(c.title)}</a></li>`).join('\n      ');
+  oebps.file('nav.xhtml', `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="he" dir="rtl">
+<head><title>תוכן עניינים</title><meta charset="UTF-8"/></head>
+<body>
+  <nav epub:type="toc"><h1>תוכן עניינים</h1><ol>${navLi}</ol></nav>
+</body>
+</html>`);
+
+  const manifestItems = [
+    '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
+    ...chapterMeta.map(c =>
+      `<item id="${c.id}" href="${c.href}" media-type="application/xhtml+xml"/>`)
+  ].join('\n    ');
+  const spineItems = chapterMeta.map(c => `<itemref idref="${c.id}"/>`).join('\n    ');
+
+  oebps.file('content.opf', `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="uid">${escapeXml(uid)}</dc:identifier>
+    <dc:title>${escapeXml(title)}</dc:title>
+    <dc:language>he</dc:language>
+    <dc:creator>ספריית הנצח</dc:creator>
+    <meta property="dcterms:modified">${date}T00:00:00Z</meta>
+  </metadata>
+  <manifest>
+    ${manifestItems}
+  </manifest>
+  <spine>
+    ${spineItems}
+  </spine>
+</package>`);
+
+  try {
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/epub+zip' });
+    downloadBlob(blob, sanitizeFilename(title) + '.epub');
+  } catch(e) {
+    alert('שגיאה ביצירת EPUB: ' + e.message);
+    exportBookHtml();
+  }
+}
+
+function setBookRating(stars) {
+  state.rating = stars;
+  save();
+  renderBookCompletePanel();
+}
+
+function renderBookCompletePanel() {
+  const existing = document.getElementById('book-complete-actions');
+  if (existing) existing.remove();
+  if (!isBookComplete()) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'book-complete-actions';
+  panel.className = 'book-complete-actions';
+  const seriesNote = state.sequelIndex > 1 ? ` · ספר ${state.sequelIndex} בסדרה` : '';
+  const stars = [1, 2, 3, 4, 5].map(n =>
+    `<button type="button" class="rating-star ${(state.rating || 0) >= n ? 'on' : ''}" onclick="setBookRating(${n})" title="${n} כוכבים">★</button>`
+  ).join('');
+
+  panel.innerHTML = `
+    <h3>✦ הספר הושלם${seriesNote} ✦</h3>
+    <p style="font-size:0.85rem;color:rgba(245,239,227,0.55);margin-bottom:0.5rem">איך היה?</p>
+    <div class="rating-row">${stars}</div>
+    <div class="complete-btn-row">
+      <button type="button" class="secondary-btn" onclick="exportBookEpub()">📥 הורד EPUB</button>
+      <button type="button" class="secondary-btn" onclick="exportBookHtml()">📄 הורד HTML</button>
+      <button type="button" class="secondary-btn" onclick="startSequelBook()">🌍 ספר הבא באותו עולם</button>
+    </div>`;
+
+  const list = document.getElementById('chapter-list');
+  if (list?.parentNode) list.parentNode.appendChild(panel);
+}
+
+function renderLibraryActions() {
+  const el = document.getElementById('library-actions');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!state.chapters.length) return;
+
+  const partial = state.chapters.length < state.totalChapters;
+  const epubBtn = document.createElement('button');
+  epubBtn.className = 'secondary-btn';
+  epubBtn.textContent = partial ? '📥 הורד EPUB (עד כה)' : '📥 הורד EPUB';
+  epubBtn.onclick = () => exportBookEpub();
+  el.appendChild(epubBtn);
+
+  const htmlBtn = document.createElement('button');
+  htmlBtn.className = 'secondary-btn';
+  htmlBtn.textContent = '📄 HTML';
+  htmlBtn.onclick = () => exportBookHtml();
+  el.appendChild(htmlBtn);
+
+  if (isBookComplete()) {
+    const sequelBtn = document.createElement('button');
+    sequelBtn.className = 'secondary-btn';
+    sequelBtn.textContent = '🌍 המשך בעולם הזה';
+    sequelBtn.onclick = () => startSequelBook();
+    el.appendChild(sequelBtn);
+  }
 }
 
 function applyBookSnapshot(snap) {
@@ -1303,7 +1584,7 @@ function renderShelf() {
     card.innerHTML = `
       <div style="flex:1">
         <div class="shelf-card-title">${b.book?.title || 'ספר ללא שם'}</div>
-        <div class="shelf-card-meta">${written} / ${total} פרקים זמינים · ${TASTE_LABELS[b.taste] || 'פנטזיה'}</div>
+        <div class="shelf-card-meta">${written} / ${total} פרקים${isBookComplete(b) ? ' · הושלם' : ''}${b.sequelIndex > 1 ? ` · ספר ${b.sequelIndex}` : ''} · ${TASTE_LABELS[b.taste] || 'פנטזיה'}</div>
       </div>
       <span style="color:var(--gold);font-size:1.2rem">📖</span>
       <button type="button" class="read-tool-btn" title="מחק" onclick="deleteBookFromShelf('${id}', event)">✕</button>`;
@@ -1636,6 +1917,9 @@ async function startBookCreation() {
     state.chapters = [];
     state.eventLog = [];
     state.memoryBook = initMemoryBookFromBlueprint(bookData);
+    state.seriesTitle = bookData.title;
+    state.sequelIndex = 1;
+    state.parentBookId = null;
     app.books[state.id] = bookSnapshot();
     save();
 
@@ -1712,6 +1996,137 @@ async function createBookBlueprint() {
   book.chapterOutlines = book.chapterOutlines.slice(0, n);
 
   return book;
+}
+
+async function createSequelBlueprint(parent) {
+  const n = state.totalChapters;
+  const tasteHint = TASTES[state.taste] || TASTES['hard-magic'];
+  const memoryJson = JSON.stringify(parent.memoryBook || {}, null, 2).slice(0, 6000);
+  const synopsis = (parent.storySynopsis || parent.eventLog?.slice(-5).join('\n') || '').slice(0, 4000);
+  const lastChapter = parent.chapters[parent.chapters.length - 1];
+  const ending = lastChapter?.text?.slice(-1500) || '';
+
+  const prompt = `צור תוכנית לספר המשך (ספר ${state.sequelIndex} בסדרה) באותו עולם — פנטזיה אפית בעברית בסגנון ברנדון סנדרסון, ${n} פרקים.
+
+**ספר קודם:** ${parent.book.title}
+**תגית:** ${parent.book.tagline || ''}
+**עולם:** ${parent.book.world || ''}
+**קסם:** ${parent.book.magicSystem || ''}
+**טעם:** ${tasteHint}
+
+**סיכום העלילה עד כה:**
+${synopsis}
+
+**ספר זיכרון (עובדות מוסכמות — שמור עקביות):**
+${memoryJson}
+
+**סיום הספר הקודם:**
+"...${ending}"
+
+החזר JSON בלבד:
+{
+  "title": "שם הספר החדש (לא אותו שם)",
+  "tagline": "משפט תיאור",
+  "genre": "פנטזיה אפית",
+  "world": "אותו עולם בקצרה",
+  "magicSystem": "מערכת הקסם (עקבית עם הקודם)",
+  "mainCharacters": [{"name": "שם", "role": "תפקיד", "trait": "תכונה"}],
+  "chapterOutlines": [{"number": 1, "title": "שם", "summary": "משפט אחד", "pov": "שם דמות"}]
+}
+
+כללים:
+- זה המשך ישיר — לא רימייק
+- chapterOutlines: בדיוק ${n} פרקים, summary משפט אחד
+- mainCharacters: 3 דמויות (יכולות לכלול דמויות מהספר הקודם)
+- JSON בלבד`;
+
+  const raw = await callGemini(prompt, '', 6000);
+  const cleaned = raw.replace(/`{3}json/gi, '').replace(/`{3}/g, '').trim();
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('תשובת ה-AI לא כללה JSON תקין — נסה שוב');
+
+  let book;
+  try { book = JSON.parse(jsonMatch[0]); }
+  catch(e) {
+    try { book = JSON.parse(cleaned); }
+    catch(e2) { throw new Error('שגיאה בפרסור JSON — נסה שוב'); }
+  }
+
+  if (!book.title || !book.chapterOutlines?.length) throw new Error('מבנה הספר שהתקבל אינו שלם');
+
+  while (book.chapterOutlines.length < n) {
+    const last = book.chapterOutlines.length;
+    book.chapterOutlines.push({
+      number: last + 1,
+      title: `פרק ${last + 1}`,
+      summary: 'המשך ההרפתקה',
+      pov: book.chapterOutlines[0]?.pov || 'הגיבור'
+    });
+  }
+  book.chapterOutlines = book.chapterOutlines.slice(0, n);
+  return book;
+}
+
+async function startSequelBook(sourceId) {
+  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+
+  const parent = sourceId ? app.books[sourceId] : bookSnapshot();
+  if (!parent?.book) {
+    alert('לא נמצא ספר מקור');
+    return;
+  }
+  if (!isBookComplete(parent)) {
+    alert('סיים קודם את כל פרקי הספר הנוכחי — ואז אפשר המשך בעולם הזה');
+    return;
+  }
+
+  const apiKey = getStoredApiKey();
+  if (!apiKey) {
+    openWelcomeApiSettings();
+    showError('welcome-error', 'נדרש מפתח API לפני פתיחת ספר המשך');
+    return;
+  }
+
+  const parentMem = deepClone(parent.memoryBook || emptyMemoryBook());
+  const parentSynopsis = parent.storySynopsis || parent.eventLog?.join('\n\n') || '';
+
+  state = createEmptyBookState();
+  state.id = newBookId();
+  state.apiKey = apiKey;
+  state.taste = parent.taste || selectedTaste;
+  state.totalChapters = parent.totalChapters || 15;
+  state.parentBookId = parent.id;
+  state.seriesTitle = parent.seriesTitle || parent.book.title;
+  state.sequelIndex = (parent.sequelIndex || 1) + 1;
+  state.memoryBook = parentMem;
+  state.storySynopsis = parentSynopsis;
+  state.eventLog = [];
+  state.chapters = [];
+  app.currentBookId = state.id;
+
+  document.getElementById('create-btn').disabled = true;
+  showScreen('loading-screen');
+  document.getElementById('loading-title').textContent = 'פותח המשך בעולם הזה...';
+  document.getElementById('loading-status').textContent = 'בונה על הסיפור הקודם...';
+
+  try {
+    const bookData = await createSequelBlueprint(parent);
+    state.book = bookData;
+    state.memoryBook = parentMem;
+    app.books[state.id] = bookSnapshot();
+    save();
+
+    renderLibrary();
+    document.getElementById('loading-status').textContent = 'מכין את הפרק הראשון...';
+    await generateChapterAt(0, { openAfter: true, useLoadingScreen: true });
+    document.getElementById('loading-title').textContent = 'פותח ספר חדש...';
+    document.getElementById('create-btn').disabled = false;
+  } catch(e) {
+    document.getElementById('create-btn').disabled = false;
+    showScreen('library-screen');
+    delete app.books[state.id];
+    showError('library-error', 'שגיאה ביצירת ספר המשך: ' + e.message);
+  }
 }
 
 // ===== CHAPTER PIPELINE (מאחורי הקלעים) =====
@@ -2180,10 +2595,15 @@ function renderLibrary() {
   document.getElementById('book-title-main').textContent = book.title;
   const oldComplete = document.getElementById('book-complete-msg');
   if (oldComplete) oldComplete.remove();
+  const oldCompleteActions = document.getElementById('book-complete-actions');
+  if (oldCompleteActions) oldCompleteActions.remove();
+
+  const seriesBadge = state.sequelIndex > 1
+    ? `<span>📜 ספר ${state.sequelIndex} · ${state.seriesTitle || book.title}</span>` : '';
 
   document.getElementById('book-meta').innerHTML =
     `<span>📚 ${total} פרקים</span><span>✨ ${book.genre || 'פנטזיה אפית'}</span>` +
-    `<span>🎭 ${TASTE_LABELS[state.taste] || 'פנטזיה'}</span><span>👁 ${writtenCount} זמינים</span>`;
+    `<span>🎭 ${TASTE_LABELS[state.taste] || 'פנטזיה'}</span><span>👁 ${writtenCount} זמינים</span>${seriesBadge}`;
   document.getElementById('book-tagline').textContent = book.tagline || '';
 
   // Progress
@@ -2233,19 +2653,14 @@ function renderLibrary() {
   const writeBtn = document.getElementById('write-next-btn');
   if (writtenCount >= total) {
     writeBtn.style.display = 'none';
-    // Show completion message if not already there
-    if (!document.getElementById('book-complete-msg')) {
-      const msg = document.createElement('div');
-      msg.id = 'book-complete-msg';
-      msg.className = 'end-of-book';
-      msg.innerHTML = '✦ הספר הושלם ✦<br><small style="font-size:0.85rem;color:var(--gold-dim)">תודה על הקריאה</small>';
-      list.parentNode.appendChild(msg);
-    }
+    renderBookCompletePanel();
   } else {
     writeBtn.style.display = 'flex';
     writeBtn.disabled = state.writing;
     writeBtn.textContent = writtenCount === 0 ? '📖 התחל לקרוא' : '📖 המשך לקרוא';
   }
+
+  renderLibraryActions();
 }
 
 // ===== OPEN CHAPTER =====
@@ -2318,8 +2733,23 @@ function openChapter(idx) {
   } else {
     const doneMsg = document.createElement('div');
     doneMsg.className = 'end-of-book';
-    doneMsg.textContent = '✦ סוף ✦';
+    doneMsg.textContent = isBookComplete() ? '✦ סוף הספר ✦' : '✦ סוף הפרק ✦';
     endEl.appendChild(doneMsg);
+    if (isBookComplete()) {
+      const row = document.createElement('div');
+      row.className = 'complete-btn-row';
+      row.style.marginTop = '1rem';
+      [['📥 EPUB', () => exportBookEpub()], ['🌍 המשך בעולם', () => startSequelBook()]]
+        .forEach(([label, fn]) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'secondary-btn';
+          b.textContent = label;
+          b.onclick = fn;
+          row.appendChild(b);
+        });
+      endEl.appendChild(row);
+    }
   }
 
   const backBtn = document.createElement('button');
