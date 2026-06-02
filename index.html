@@ -895,6 +895,10 @@ function load() {
     const s = localStorage.getItem(STORAGE_KEY);
     if (s) state = JSON.parse(s);
     ensureMemoryBook();
+    if (state.writing) {
+      state.writing = false;
+      save();
+    }
   } catch(e) {}
 }
 
@@ -1175,10 +1179,10 @@ async function writeNextChapter() {
     if (!state.eventLog) state.eventLog = [];
     state.eventLog.push(`פרק ${chapterNum} (${outline.title}):\n${summary}`);
 
-    save();
-
     state.writing = false;
+    save();
     document.getElementById('writing-indicator').style.display = 'none';
+    document.getElementById('write-next-btn').disabled = false;
     renderLibrary();
     openChapter(state.chapters.length - 1);
 
