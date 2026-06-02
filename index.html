@@ -879,6 +879,7 @@ let state = {
   book: null,       // { title, tagline, world, characters, magicSystem, chapterOutlines[] }
   chapters: [],     // written chapter texts { title, text, number, summary }
   eventLog: [],     // running story log: array of strings, one per chapter
+  memoryBook: null, // ספר הזיכרון: characters, locations, artifacts, magicRules, openMysteries
   writing: false,
   currentReadingChapter: 0
 };
@@ -893,7 +894,72 @@ function load() {
   try {
     const s = localStorage.getItem(STORAGE_KEY);
     if (s) state = JSON.parse(s);
+    ensureMemoryBook();
   } catch(e) {}
+}
+
+function setWritingStatus(msg) {
+  const el = document.getElementById('writing-status-text');
+  if (el) el.textContent = msg;
+}
+
+function parseJsonFromResponse(raw) {
+  const cleaned = raw.replace(/`{3}json/gi, '').replace(/`{3}/g, '').trim();
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+  try { return JSON.parse(jsonMatch[0]); }
+  catch(e) {
+    try { return JSON.parse(cleaned); } catch(e2) { return null; }
+  }
+}
+
+function emptyMemoryBook() {
+  return { characters: [], locations: [], artifacts: [], magicRules: [], openMysteries: [] };
+}
+
+function ensureMemoryBook() {
+  if (!state.memoryBook) {
+    state.memoryBook = state.book ? initMemoryBookFromBlueprint(state.book) : emptyMemoryBook();
+  }
+}
+
+function initMemoryBookFromBlueprint(book) {
+  return {
+    characters: (book.mainCharacters || []).map(c => ({
+      name: c.name,
+      role: c.role || '',
+      status: 'פעיל',
+      notes: c.trait || ''
+    })),
+    locations: book.world ? [{ name: 'עולם', description: book.world, significance: 'בסיס' }] : [],
+    artifacts: [],
+    magicRules: book.magicSystem
+      ? [{ rule: book.magicSystem, establishedInChapter: 0, notes: 'מערכת קסם ראשית' }]
+      : [],
+    openMysteries: []
+  };
+}
+
+function formatMemoryBookForPrompt() {
+  ensureMemoryBook();
+  const mb = state.memoryBook;
+  const fmt = (arr, lineFn) => (arr?.length ? arr.map(lineFn).join('\n') : '(ריק)');
+  return `**ספר הזיכרון (עובדות מוסכמות — חובה לשמור על עקביות):**
+
+דמויות:
+${fmt(mb.characters, c => `- ${c.name} (${c.role}): ${c.status}. ${c.notes || ''}`)}
+
+מקומות:
+${fmt(mb.locations, l => `- ${l.name}: ${l.description}. ${l.significance || ''}`)}
+
+חפצים:
+${fmt(mb.artifacts, a => `- ${a.name}: ${a.description}. בעלים: ${a.owner || '?'}. ${a.status || ''}`)}
+
+כללי קסם:
+${fmt(mb.magicRules, r => `- ${r.rule} (מוכר מפרק ${r.establishedInChapter || 0}). ${r.notes || ''}`)}
+
+תעלומות פתוחות:
+${fmt(mb.openMysteries, m => `- ${m.question} [${m.status || 'פתוח'}, מפרק ${m.introducedChapter || '?'}]. רמזים: ${m.clues || ''}`)}`;
 }
 
 // ===== SCREEN MANAGEMENT =====
@@ -992,6 +1058,7 @@ async function startBookCreation() {
     state.book = bookData;
     state.chapters = [];
     state.eventLog = [];
+    state.memoryBook = initMemoryBookFromBlueprint(bookData);
     save();
 
     clearInterval(statusInterval);
@@ -1067,13 +1134,14 @@ async function createBookBlueprint() {
   return book;
 }
 
-// ===== WRITE CHAPTER =====
+// ===== CHAPTER PIPELINE: Plan → Write → Review → Fix =====
 async function writeNextChapter() {
   if (state.writing) return;
 
   const nextIdx = state.chapters.length;
   if (nextIdx >= state.totalChapters) return;
 
+  ensureMemoryBook();
   state.writing = true;
   document.getElementById('write-next-btn').disabled = true;
   document.getElementById('writing-indicator').style.display = 'flex';
@@ -1082,14 +1150,27 @@ async function writeNextChapter() {
   const outline = state.book.chapterOutlines[nextIdx];
   const chapterNum = nextIdx + 1;
 
-  document.getElementById('writing-status-text').textContent = `כותב פרק ${chapterNum}: "${outline.title}"...`;
-
   try {
-    const text = await writeChapter(nextIdx);
+    setWritingStatus(`מתכנן פרק ${chapterNum}: "${outline.title}"...`);
+    const plan = await planChapter(nextIdx);
+
+    setWritingStatus(`כותב פרק ${chapterNum}: "${outline.title}"...`);
+    let text = await writeChapter(nextIdx, plan);
+
+    setWritingStatus(`בודק עקביות בפרק ${chapterNum}...`);
+    let review = await reviewChapter(text, nextIdx, plan);
+    let fixAttempts = 0;
+    while (!review.approved && fixAttempts < 2) {
+      setWritingStatus(`מתקן בעיות בפרק ${chapterNum}...`);
+      text = await fixChapter(text, review, nextIdx, plan);
+      review = await reviewChapter(text, nextIdx, plan);
+      fixAttempts++;
+    }
+
     state.chapters.push({ title: outline.title, text, number: chapterNum });
 
-    // Summarize and add to event log
-    document.getElementById('writing-status-text').textContent = `מעבד יומן אירועים...`;
+    setWritingStatus(`מעדכן ספר זיכרון ויומן אירועים...`);
+    await updateMemoryBook(text, chapterNum, outline);
     const summary = await summarizeChapter(text, chapterNum, outline);
     if (!state.eventLog) state.eventLog = [];
     state.eventLog.push(`פרק ${chapterNum} (${outline.title}):\n${summary}`);
@@ -1099,8 +1180,6 @@ async function writeNextChapter() {
     state.writing = false;
     document.getElementById('writing-indicator').style.display = 'none';
     renderLibrary();
-
-    // Auto-open the newly written chapter
     openChapter(state.chapters.length - 1);
 
   } catch(e) {
@@ -1108,6 +1187,142 @@ async function writeNextChapter() {
     document.getElementById('write-next-btn').disabled = false;
     document.getElementById('writing-indicator').style.display = 'none';
     showError('library-error', 'שגיאה בכתיבת הפרק: ' + e.message);
+  }
+}
+
+async function planChapter(idx) {
+  const book = state.book;
+  const outline = book.chapterOutlines[idx];
+  const memoryContext = formatMemoryBookForPrompt();
+
+  let priorContext = '';
+  if (idx > 0 && state.eventLog?.length) {
+    priorContext = `**יומן אירועים:**\n${state.eventLog.join('\n\n')}`;
+  }
+
+  const prompt = `תכנן את הפרק הבא לפני כתיבה. החזר JSON בלבד:
+{
+  "scenes": [{"goal": "מטרת הסצנה", "location": "מקום", "characters": ["שמות"], "beat": "מה קורה"}],
+  "chapterGoal": "מטרת הפרק במשפט",
+  "povFocus": "מה נקודת המבט חייבת להדגיש",
+  "mysteryHooks": ["תעלומות/שאלות לפתח או להזכיר"],
+  "continuityMust": ["עובדות שחייבות להופיע או להישמר"],
+  "magicUse": "איך הקסם מופיע בפרק"
+}
+
+**ספר:** ${book.title}
+**פרק ${outline.number}:** ${outline.title} — ${outline.summary}
+**נקודת מבט:** ${outline.pov}
+
+${memoryContext}
+
+${priorContext}
+
+3-4 סצנות. JSON בלבד.`;
+
+  const raw = await callGemini(prompt, '', 2500);
+  const plan = parseJsonFromResponse(raw);
+  if (!plan?.scenes?.length) {
+    return {
+      scenes: [{ goal: outline.summary, location: '', characters: [outline.pov], beat: outline.summary }],
+      chapterGoal: outline.summary,
+      povFocus: outline.pov,
+      mysteryHooks: [],
+      continuityMust: [],
+      magicUse: book.magicSystem || ''
+    };
+  }
+  return plan;
+}
+
+async function reviewChapter(text, idx, plan) {
+  const book = state.book;
+  const outline = book.chapterOutlines[idx];
+  const memoryContext = formatMemoryBookForPrompt();
+
+  const prompt = `בדוק את הפרק מול התכנון וספר הזיכרון. החזר JSON בלבד:
+{
+  "approved": true/false,
+  "score": 1-10,
+  "issues": [{"type": "דמות|מקום|קסם|תעלומה|עלילה|סגנון", "description": "בעיה", "severity": "גבוה|בינוני|נמוך"}]
+}
+
+**פרק ${outline.number}:** ${outline.title}
+**תכנון:**
+${JSON.stringify(plan, null, 2)}
+
+${memoryContext}
+
+**טקסט הפרק (תחילתו):**
+${text.substring(0, 5000)}
+
+approved=true רק אם אין בעיות severity גבוה, והפרק תואם את התכנון וספר הזיכרון.`;
+
+  const raw = await callGemini(prompt, '', 2000);
+  const review = parseJsonFromResponse(raw);
+  if (!review) return { approved: true, score: 7, issues: [] };
+  if (review.approved === undefined) {
+    review.approved = !review.issues?.some(i => i.severity === 'גבוה');
+  }
+  return review;
+}
+
+async function fixChapter(text, review, idx, plan) {
+  const book = state.book;
+  const outline = book.chapterOutlines[idx];
+  const memoryContext = formatMemoryBookForPrompt();
+  const issuesList = (review.issues || [])
+    .map((i, n) => `${n + 1}. [${i.type}/${i.severity}] ${i.description}`)
+    .join('\n');
+
+  const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך דומה (1800-2500 מילים), סגנון סנדרסוני, ומעברי [***].
+אל תשנה אירועים שלא קשורים לתיקון. החזר פרוזה מתוקנת בלבד — ללא כותרת, ללא הסברים.
+
+**בעיות לתיקון:**
+${issuesList || 'שיפור עקביות כללי'}
+
+**תכנון הפרק:**
+${JSON.stringify(plan, null, 2)}
+
+${memoryContext}
+
+**פרק לתיקון:**
+${text}`;
+
+  const fixed = await callGemini(prompt, '', 8192);
+  if (!fixed || fixed.length < 200) return text;
+  return fixed.trim();
+}
+
+async function updateMemoryBook(chapterText, chapterNum, outline) {
+  ensureMemoryBook();
+  const current = JSON.stringify(state.memoryBook, null, 2);
+
+  const prompt = `עדכן את ספר הזיכרון של הספר על בסיס הפרק החדש.
+
+ספר זיכרון נוכחי:
+${current}
+
+פרק ${chapterNum} — ${outline.title}:
+${chapterText.substring(0, 6000)}
+
+החזר JSON בלבד:
+{
+  "characters": [{"name":"","role":"","status":"","notes":""}],
+  "locations": [{"name":"","description":"","significance":""}],
+  "artifacts": [{"name":"","description":"","owner":"","status":""}],
+  "magicRules": [{"rule":"","establishedInChapter":0,"notes":""}],
+  "openMysteries": [{"question":"","introducedChapter":0,"status":"פתוח|נפתר|בתהליך","clues":""}]
+}
+
+כללים: עדכן קיימים, הוסף חדשים, סמן תעלומות שנפתרו, אל תמחק עובדות חשובות מפרקים קודמים. JSON בלבד.`;
+
+  try {
+    const raw = await callGemini(prompt, '', 4000);
+    const updated = parseJsonFromResponse(raw);
+    if (updated?.characters) state.memoryBook = updated;
+  } catch(e) {
+    console.warn('updateMemoryBook failed:', e);
   }
 }
 
@@ -1129,23 +1344,30 @@ ${chapterText.substring(0, 3000)}`;
   }
 }
 
-async function writeChapter(idx) {
+async function writeChapter(idx, plan) {
   const book = state.book;
   const outline = book.chapterOutlines[idx];
+  const memoryContext = formatMemoryBookForPrompt();
 
-  // Build event log context — full history of what happened
   let eventLogContext = '';
   if (idx > 0 && state.eventLog && state.eventLog.length > 0) {
     eventLogContext = `**יומן אירועים — מה קרה עד כה:**\n${state.eventLog.join('\n\n')}`;
   }
 
-  // Last chapter's closing lines for narrative continuity
   let lastChapterSnippet = '';
   if (idx > 0 && state.chapters.length > 0) {
     const last = state.chapters[state.chapters.length - 1];
     const lines = last.text.split('\n').filter(l => l.trim()).slice(-4).join(' ');
     lastChapterSnippet = `**שורות הסיום של הפרק הקודם (לרצף נרטיבי):**\n"${lines.substring(0, 500)}..."`;
   }
+
+  const planContext = `**תכנון הפרק (עקוב אחריו):**
+מטרה: ${plan.chapterGoal || outline.summary}
+מיקוד POV: ${plan.povFocus || outline.pov}
+סצנות: ${(plan.scenes || []).map((s, i) => `${i + 1}. ${s.goal} @ ${s.location || '?'} — ${s.beat}`).join('\n')}
+חובות עקביות: ${(plan.continuityMust || []).join('; ') || '—'}
+תעלומות: ${(plan.mysteryHooks || []).join('; ') || '—'}
+קסם: ${plan.magicUse || book.magicSystem}`;
 
   const prompt = `אתה ברנדון סנדרסון הכותב ספר פנטזיה אפי בעברית.
 
@@ -1161,10 +1383,15 @@ async function writeChapter(idx) {
 תוכן: ${outline.summary}
 נקודת מבט: ${outline.pov}
 
+${memoryContext}
+
+${planContext}
+
 ${eventLogContext ? eventLogContext + '\n\n' : ''}${lastChapterSnippet ? lastChapterSnippet + '\n\n' : ''}**הנחיות:**
 - כתוב פרק שלם ומגובש בעברית ספרותית יפה
 - 1800-2500 מילים
 - שמור על רצף מלא עם הפרקים הקודמים — אל תסתור אירועים ביומן
+- שמור על עקביות מוחלטת עם ספר הזיכרון (דמויות, מקומות, קסם, תעלומות)
 - פתח עם scene מיידי — אל תפתח עם רקע
 - השתמש בדיאלוג, תיאורים חושניים ומתח
 - הגבר את מערכת הקסם בצורה אורגנית
@@ -1335,6 +1562,7 @@ function newBook() {
   state.book = null;
   state.chapters = [];
   state.eventLog = [];
+  state.memoryBook = null;
   state.writing = false;
   save();
   showScreen('welcome-screen');
