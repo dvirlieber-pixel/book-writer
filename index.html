@@ -529,6 +529,38 @@
     min-height: 1.5rem;
   }
 
+  .reading-preparing {
+    display: none;
+    text-align: center;
+    padding: 2rem 1rem;
+    margin-top: 2rem;
+    border: 1px solid rgba(201,168,76,0.25);
+    border-radius: 2px;
+    background: rgba(201,168,76,0.05);
+    color: var(--gold-dim);
+    font-size: 0.95rem;
+  }
+  .reading-preparing.active { display: block; }
+
+  .reading-preparing .prep-spinner {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  details.api-settings {
+    margin-top: 1.25rem;
+    text-align: right;
+    font-size: 0.85rem;
+    color: rgba(245,239,227,0.55);
+  }
+  details.api-settings summary {
+    cursor: pointer;
+    color: var(--gold-dim);
+    list-style: none;
+  }
+  details.api-settings summary::-webkit-details-marker { display: none; }
+
   .dot-anim span {
     animation: dot-bounce 1.4s ease-in-out infinite;
     display: inline-block;
@@ -777,7 +809,7 @@
 
   <div class="welcome-card">
     <h2>ספר חדש מחכה לך</h2>
-    <p>בחר את אורך ההרפתקה, הזן מפתח API, ולחץ על "צור ספר" — השאר קורה מאחורי הקלעים.</p>
+    <p>בחר אורך, לחץ "פתח ספר" — והתחל לקרוא. העולם והפרקים נבנים מאחורי הקלעים.</p>
 
     <div class="length-options">
       <button class="length-btn selected" onclick="selectLength(this, 15)">
@@ -794,12 +826,15 @@
       </button>
     </div>
 
-    <div class="key-input-area">
-      <label>מפתח Gemini API (חינמי)</label>
-      <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" />
-    </div>
+    <details class="api-settings">
+      <summary>⚙ הגדרות (מפתח API)</summary>
+      <div class="key-input-area" style="margin-top:1rem">
+        <label>מפתח Gemini API (חינמי)</label>
+        <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" />
+      </div>
+    </details>
 
-    <button class="create-btn" id="create-btn" onclick="startBookCreation()">✦ צור את הספר שלי ✦</button>
+    <button class="create-btn" id="create-btn" onclick="startBookCreation()">✦ פתח ספר חדש ✦</button>
     <div id="welcome-error" class="error-msg" style="display:none"></div>
   </div>
 </div>
@@ -807,7 +842,7 @@
 <!-- LOADING SCREEN -->
 <div id="loading-screen" class="screen">
   <div class="loading-rune">⚙</div>
-  <div class="loading-title">יוצר עולם חדש...</div>
+  <div class="loading-title">פותח ספר חדש...</div>
   <div class="loading-status" id="loading-status">מגדיר מערכת קסם...</div>
   <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
 </div>
@@ -829,7 +864,7 @@
 
     <div class="progress-section">
       <div class="progress-label">
-        <span>התקדמות</span>
+        <span>זמין לקריאה</span>
         <span id="progress-text">0 / 0 פרקים</span>
       </div>
       <div class="progress-track">
@@ -839,12 +874,12 @@
 
     <div class="chapter-list" id="chapter-list"></div>
 
-    <button class="write-next-btn" id="write-next-btn" onclick="writeNextChapter()">
-      ✍️ כתוב את הפרק הבא
+    <button class="write-next-btn" id="write-next-btn" onclick="readNextChapter()">
+      📖 התחל לקרוא
     </button>
     <div class="writing-indicator" id="writing-indicator" style="display:none">
       <span class="dot-anim"><span>•</span><span>•</span><span>•</span></span>
-      <span id="writing-status-text">כותב את הפרק...</span>
+      <span id="writing-status-text">מכין את הפרק...</span>
     </div>
     <div id="library-error" class="error-msg" style="display:none"></div>
   </div>
@@ -867,6 +902,11 @@
 
     <div class="chapter-content" id="reading-chapter-content"></div>
 
+    <div class="reading-preparing" id="reading-preparing">
+      <div class="prep-spinner">✦</div>
+      <div id="reading-preparing-text">הפרק הבא בהכנה...</div>
+    </div>
+
     <div class="chapter-end-actions" id="chapter-end-actions"></div>
   </div>
 </div>
@@ -881,6 +921,8 @@ let state = {
   eventLog: [],     // running story log: array of strings, one per chapter
   memoryBook: null, // ספר הזיכרון: characters, locations, artifacts, magicRules, openMysteries
   writing: false,
+  generatingIdx: null,
+  lastReadChapter: 0,
   currentReadingChapter: 0
 };
 
@@ -905,6 +947,37 @@ function load() {
 function setWritingStatus(msg) {
   const el = document.getElementById('writing-status-text');
   if (el) el.textContent = msg;
+}
+
+function setPreparingStatus(msg, useLoadingScreen) {
+  if (useLoadingScreen) {
+    const el = document.getElementById('loading-status');
+    if (el) el.textContent = msg;
+  } else {
+    setWritingStatus(msg);
+  }
+}
+
+function showReadingPreparing(show, msg) {
+  const box = document.getElementById('reading-preparing');
+  const text = document.getElementById('reading-preparing-text');
+  if (!box) return;
+  box.classList.toggle('active', show);
+  if (msg && text) text.textContent = msg;
+}
+
+function waitForGeneration() {
+  return new Promise(resolve => {
+    const tick = () => {
+      if (!state.writing) resolve();
+      else setTimeout(tick, 400);
+    };
+    tick();
+  });
+}
+
+function isReadingScreenActive() {
+  return document.getElementById('reading-screen')?.classList.contains('active');
 }
 
 function parseJsonFromResponse(raw) {
@@ -1044,11 +1117,11 @@ async function startBookCreation() {
   showScreen('loading-screen');
 
   const statuses = [
-    'מגדיר מערכת קסם...',
-    'בונה את העולם...',
-    'יוצר דמויות...',
+    'בוחר את שולחן הכתיבה...',
+    'מכין את העולם...',
+    'מייצר דמויות...',
     'מתכנן את העלילה...',
-    'מכין את תוכן העניינים...'
+    'מסדר את תוכן העניינים...'
   ];
 
   let si = 0;
@@ -1066,8 +1139,10 @@ async function startBookCreation() {
     save();
 
     clearInterval(statusInterval);
+    save();
     renderLibrary();
-    showScreen('library-screen');
+    document.getElementById('loading-status').textContent = 'מכין את הפרק הראשון...';
+    await generateChapterAt(0, { openAfter: true, useLoadingScreen: true });
   } catch(e) {
     clearInterval(statusInterval);
     document.getElementById('create-btn').disabled = false;
@@ -1138,60 +1213,152 @@ async function createBookBlueprint() {
   return book;
 }
 
-// ===== CHAPTER PIPELINE: Plan → Write → Review → Fix =====
-async function writeNextChapter() {
-  if (state.writing) return;
-
-  const nextIdx = state.chapters.length;
-  if (nextIdx >= state.totalChapters) return;
+// ===== CHAPTER PIPELINE (מאחורי הקלעים) =====
+async function generateChapterAt(idx, { background = false, openAfter = false, useLoadingScreen = false } = {}) {
+  if (!state.book || idx >= state.totalChapters) return;
+  if (idx < state.chapters.length) {
+    if (openAfter) openChapter(idx);
+    return;
+  }
+  if (state.writing) {
+    if (background) return;
+    await waitForGeneration();
+    if (idx < state.chapters.length) {
+      if (openAfter) openChapter(idx);
+      return;
+    }
+    if (state.writing) return;
+  }
 
   ensureMemoryBook();
   state.writing = true;
-  document.getElementById('write-next-btn').disabled = true;
-  document.getElementById('writing-indicator').style.display = 'flex';
-  document.getElementById('library-error').style.display = 'none';
+  state.generatingIdx = idx;
+  const outline = state.book.chapterOutlines[idx];
+  const chapterNum = idx + 1;
 
-  const outline = state.book.chapterOutlines[nextIdx];
-  const chapterNum = nextIdx + 1;
+  if (!background) {
+    document.getElementById('write-next-btn').disabled = true;
+    document.getElementById('writing-indicator').style.display = 'flex';
+    document.getElementById('library-error').style.display = 'none';
+  }
 
   try {
-    setWritingStatus(`מתכנן פרק ${chapterNum}: "${outline.title}"...`);
-    const plan = await planChapter(nextIdx);
+    setPreparingStatus(`מכין את פרק ${chapterNum}...`, useLoadingScreen);
+    const plan = await planChapter(idx);
 
-    setWritingStatus(`כותב פרק ${chapterNum}: "${outline.title}"...`);
-    let text = await writeChapter(nextIdx, plan);
+    setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum})...`, useLoadingScreen);
+    let text = await writeChapter(idx, plan);
 
-    setWritingStatus(`בודק עקביות בפרק ${chapterNum}...`);
-    let review = await reviewChapter(text, nextIdx, plan);
+    setPreparingStatus(`מוודא שהפרק ${chapterNum} מוכן...`, useLoadingScreen);
+    let review = await reviewChapter(text, idx, plan);
     let fixAttempts = 0;
     while (!review.approved && fixAttempts < 2) {
-      setWritingStatus(`מתקן בעיות בפרק ${chapterNum}...`);
-      text = await fixChapter(text, review, nextIdx, plan);
-      review = await reviewChapter(text, nextIdx, plan);
+      setPreparingStatus(`מלטש את פרק ${chapterNum}...`, useLoadingScreen);
+      text = await fixChapter(text, review, idx, plan);
+      review = await reviewChapter(text, idx, plan);
       fixAttempts++;
     }
 
     state.chapters.push({ title: outline.title, text, number: chapterNum });
 
-    setWritingStatus(`מעדכן ספר זיכרון ויומן אירועים...`);
+    setPreparingStatus('כמעט מוכן...', useLoadingScreen);
     await updateMemoryBook(text, chapterNum, outline);
     const summary = await summarizeChapter(text, chapterNum, outline);
     if (!state.eventLog) state.eventLog = [];
     state.eventLog.push(`פרק ${chapterNum} (${outline.title}):\n${summary}`);
 
     state.writing = false;
+    state.generatingIdx = null;
     save();
-    document.getElementById('writing-indicator').style.display = 'none';
-    document.getElementById('write-next-btn').disabled = false;
+
+    if (!background) {
+      document.getElementById('writing-indicator').style.display = 'none';
+      document.getElementById('write-next-btn').disabled = false;
+    }
     renderLibrary();
-    openChapter(state.chapters.length - 1);
+
+    if (openAfter) openChapter(idx);
+    else if (isReadingScreenActive()) refreshReadingEndActions();
+
+    prefetchChapter(idx + 1);
 
   } catch(e) {
     state.writing = false;
-    document.getElementById('write-next-btn').disabled = false;
-    document.getElementById('writing-indicator').style.display = 'none';
-    showError('library-error', 'שגיאה בכתיבת הפרק: ' + e.message);
+    state.generatingIdx = null;
+    save();
+    if (!background) {
+      document.getElementById('write-next-btn').disabled = false;
+      document.getElementById('writing-indicator').style.display = 'none';
+      if (useLoadingScreen) {
+        showScreen('library-screen');
+        showError('library-error', 'לא הצלחנו להכין את הפרק: ' + e.message);
+      } else {
+        showError('library-error', 'לא הצלחנו להכין את הפרק: ' + e.message);
+      }
+      showReadingPreparing(false);
+    }
+    throw e;
   }
+}
+
+function prefetchChapter(idx) {
+  if (idx >= state.totalChapters || idx < state.chapters.length || state.writing) return;
+  generateChapterAt(idx, { background: true }).catch(() => {});
+}
+
+async function readNextChapter() {
+  const written = state.chapters.length;
+  if (written === 0) {
+    try { await generateChapterAt(0, { openAfter: true }); } catch(e) {}
+    return;
+  }
+  const last = state.lastReadChapter ?? 0;
+  const nextToRead = last + 1;
+  if (nextToRead < written) {
+    openChapter(nextToRead);
+    prefetchChapter(written);
+    return;
+  }
+  if (nextToRead >= state.totalChapters) {
+    openChapter(Math.min(last, written - 1));
+    return;
+  }
+  try {
+    await generateChapterAt(nextToRead, { openAfter: true });
+  } catch(e) {}
+}
+
+async function continueFromChapter(currentIdx) {
+  const nextIdx = currentIdx + 1;
+  if (nextIdx >= state.totalChapters) return;
+
+  if (nextIdx < state.chapters.length) {
+    openChapter(nextIdx);
+    return;
+  }
+
+  showReadingPreparing(true, `מכין את פרק ${nextIdx + 1}...`);
+  try {
+    if (state.writing && state.generatingIdx === nextIdx) {
+      await waitForGeneration();
+      if (nextIdx < state.chapters.length) openChapter(nextIdx);
+    } else if (!state.writing) {
+      await generateChapterAt(nextIdx, { openAfter: true });
+    } else {
+      await waitForGeneration();
+      if (nextIdx < state.chapters.length) openChapter(nextIdx);
+      else await generateChapterAt(nextIdx, { openAfter: true });
+    }
+  } catch(e) {
+    showError('library-error', 'לא הצלחנו להכין את הפרק: ' + e.message);
+  } finally {
+    showReadingPreparing(false);
+  }
+}
+
+function refreshReadingEndActions() {
+  const idx = state.currentReadingChapter;
+  if (state.chapters[idx]) openChapter(idx);
 }
 
 async function planChapter(idx) {
@@ -1422,12 +1589,12 @@ function renderLibrary() {
   // Book info
   document.getElementById('book-title-main').textContent = book.title;
   document.getElementById('book-meta').innerHTML =
-    `<span>📚 ${total} פרקים</span><span>✨ ${book.genre || 'פנטזיה אפית'}</span><span>👁 ${writtenCount} נכתבו</span>`;
+    `<span>📚 ${total} פרקים</span><span>✨ ${book.genre || 'פנטזיה אפית'}</span><span>👁 ${writtenCount} זמינים</span>`;
   document.getElementById('book-tagline').textContent = book.tagline || '';
 
   // Progress
   const pct = total > 0 ? Math.round((writtenCount / total) * 100) : 0;
-  document.getElementById('progress-text').textContent = `${writtenCount} / ${total} פרקים`;
+  document.getElementById('progress-text').textContent = `${writtenCount} / ${total} זמינים`;
   document.getElementById('progress-fill').style.width = pct + '%';
 
   // Chapter list
@@ -1443,15 +1610,17 @@ function renderLibrary() {
     const btn = document.createElement('button');
     btn.className = `chapter-item ${isWritten ? 'written' : isNext ? 'next-to-write' : 'locked'}`;
 
+    const isPreparing = isNext && state.writing && state.generatingIdx === i;
     const statusLabel = isWritten ? '<span class="chapter-status done">✓</span>' :
-                        isNext ? '<span class="chapter-status write">✍</span>' :
+                        isPreparing ? '<span class="chapter-status write">⏳</span>' :
+                        isNext ? '<span class="chapter-status write">📖</span>' :
                         '<span class="chapter-status lock">🔒</span>';
 
     btn.innerHTML = `
       <span class="chapter-num">${i+1}</span>
       <div class="chapter-info">
         <div class="chapter-name">${isWritten || isNext ? outline.title : '???'}</div>
-        <div class="chapter-hint">${isWritten ? `נקודת מבט: ${outline.pov}` : isNext ? 'מוכן לכתיבה' : 'ינעל לאחר קריאת הפרקים הקודמים'}</div>
+        <div class="chapter-hint">${isWritten ? `נקודת מבט: ${outline.pov}` : isPreparing ? 'בהכנה...' : isNext ? 'לחץ "המשך לקרוא"' : 'יקריא לאחר הפרקים הקודמים'}</div>
       </div>
       ${statusLabel}
     `;
@@ -1459,6 +1628,8 @@ function renderLibrary() {
     if (isWritten) {
       const capturedIdx = i;
       btn.onclick = () => openChapter(capturedIdx);
+    } else if (isNext && !state.writing) {
+      btn.onclick = () => readNextChapter();
     }
 
     list.appendChild(btn);
@@ -1479,6 +1650,7 @@ function renderLibrary() {
   } else {
     writeBtn.style.display = 'flex';
     writeBtn.disabled = state.writing;
+    writeBtn.textContent = writtenCount === 0 ? '📖 התחל לקרוא' : '📖 המשך לקרוא';
   }
 }
 
@@ -1488,6 +1660,8 @@ function openChapter(idx) {
   if (!chapter) return;
 
   state.currentReadingChapter = idx;
+  state.lastReadChapter = idx;
+  save();
 
   document.getElementById('reading-chapter-label').textContent = `פרק ${chapter.number} מתוך ${state.totalChapters}`;
   document.getElementById('reading-chapter-num').textContent = `פרק ${chapter.number}`;
@@ -1518,8 +1692,11 @@ function openChapter(idx) {
   const endEl = document.getElementById('chapter-end-actions');
   endEl.innerHTML = '';
 
+  showReadingPreparing(false);
+
   const isLast = idx === state.totalChapters - 1;
   const nextWritten = idx + 1 < state.chapters.length;
+  const nextPreparing = state.writing && state.generatingIdx === idx + 1;
 
   if (!isLast) {
     if (nextWritten) {
@@ -1528,15 +1705,21 @@ function openChapter(idx) {
       nextBtn.textContent = 'פרק הבא →';
       nextBtn.onclick = () => openChapter(idx + 1);
       endEl.appendChild(nextBtn);
+    } else if (nextPreparing) {
+      const waitBtn = document.createElement('button');
+      waitBtn.className = 'next-chapter-btn';
+      waitBtn.disabled = true;
+      waitBtn.textContent = 'הפרק הבא בהכנה...';
+      endEl.appendChild(waitBtn);
+      waitForGeneration().then(() => {
+        if (idx + 1 < state.chapters.length) refreshReadingEndActions();
+      });
     } else {
-      const writeBtn = document.createElement('button');
-      writeBtn.className = 'next-chapter-btn';
-      writeBtn.textContent = '✍️ כתוב את הפרק הבא';
-      writeBtn.onclick = () => {
-        showLibrary();
-        setTimeout(() => writeNextChapter(), 100);
-      };
-      endEl.appendChild(writeBtn);
+      const contBtn = document.createElement('button');
+      contBtn.className = 'next-chapter-btn';
+      contBtn.textContent = 'המשך לקרוא →';
+      contBtn.onclick = () => continueFromChapter(idx);
+      endEl.appendChild(contBtn);
     }
   } else {
     const doneMsg = document.createElement('div');
@@ -1553,6 +1736,8 @@ function openChapter(idx) {
 
   showScreen('reading-screen');
   window.scrollTo(0, 0);
+
+  prefetchChapter(idx + 1);
 }
 
 // ===== UTILS =====
@@ -1568,6 +1753,8 @@ function newBook() {
   state.eventLog = [];
   state.memoryBook = null;
   state.writing = false;
+  state.generatingIdx = null;
+  state.lastReadChapter = 0;
   save();
   showScreen('welcome-screen');
   document.getElementById('create-btn').disabled = false;
@@ -1577,9 +1764,16 @@ function newBook() {
 // ===== INIT =====
 load();
 
+if (state.apiKey) {
+  const keyInput = document.getElementById('api-key-input');
+  if (keyInput) keyInput.value = state.apiKey;
+}
+
 if (state.book) {
-  // Restore previous session
   renderLibrary();
+  if (state.chapters.length > 0) {
+    prefetchChapter(state.chapters.length);
+  }
   showScreen('library-screen');
 } else {
   showScreen('welcome-screen');
