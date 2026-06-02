@@ -1059,7 +1059,7 @@ function selectLength(btn, n) {
 }
 
 // ===== API CALL =====
-async function callGemini(prompt, systemPrompt, maxTokens = 8192, retries = 4) {
+async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4) {
   const delay = ms => new Promise(res => setTimeout(res, ms));
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -1089,7 +1089,11 @@ async function callGemini(prompt, systemPrompt, maxTokens = 8192, retries = 4) {
       }
 
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const candidate = data.candidates?.[0];
+      return {
+        text: candidate?.content?.parts?.[0]?.text || '',
+        finishReason: candidate?.finishReason || ''
+      };
 
     } catch(e) {
       if (attempt < retries && (e.message.includes('503') || e.message.includes('fetch'))) {
@@ -1101,6 +1105,41 @@ async function callGemini(prompt, systemPrompt, maxTokens = 8192, retries = 4) {
     }
   }
   throw new Error('השרת עמוס מדי — נסה שוב מאוחר יותר');
+}
+
+async function callGemini(prompt, systemPrompt, maxTokens = 8192, retries = 4) {
+  const { text } = await callGeminiRaw(prompt, systemPrompt, maxTokens, retries);
+  return text;
+}
+
+function countWords(text) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function endsWithCompleteSentence(text) {
+  const t = text.trim();
+  if (!t) return false;
+  return /[.!?…]["'»”]?\s*$/.test(t) || /[.!?…]["'»”]?$/.test(t.slice(-4));
+}
+
+function isOutputTruncated(text, finishReason, minWords) {
+  if (finishReason === 'MAX_TOKENS') return true;
+  if (countWords(text) < minWords) return true;
+  return !endsWithCompleteSentence(text);
+}
+
+function mergeContinuation(existing, continuation) {
+  const tail = existing.trimEnd();
+  const head = continuation.trimStart();
+  if (!head) return tail;
+  if (head.startsWith(tail.slice(-Math.min(80, tail.length)))) return tail;
+  const overlap = 120;
+  const tailBit = tail.slice(-overlap);
+  if (head.includes(tailBit) && tailBit.length > 20) {
+    const idx = head.indexOf(tailBit);
+    return tail + head.slice(idx + tailBit.length);
+  }
+  return tail + '\n' + head;
 }
 
 // ===== BOOK CREATION =====
@@ -1247,7 +1286,10 @@ async function generateChapterAt(idx, { background = false, openAfter = false, u
     const plan = await planChapter(idx);
 
     setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum})...`, useLoadingScreen);
-    let text = await writeChapter(idx, plan);
+    const onScene = (si, total) => {
+      setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum}, חלק ${si + 1}/${total})...`, useLoadingScreen);
+    };
+    let text = await writeChapter(idx, plan, onScene);
 
     setPreparingStatus(`מוודא שהפרק ${chapterNum} מוכן...`, useLoadingScreen);
     let review = await reviewChapter(text, idx, plan);
@@ -1424,16 +1466,30 @@ ${JSON.stringify(plan, null, 2)}
 
 ${memoryContext}
 
-**טקסט הפרק (תחילתו):**
-${text.substring(0, 5000)}
+**סוף הפרק (חשוב לבדיקת סיום):**
+${text.slice(-1200)}
 
-approved=true רק אם אין בעיות severity גבוה, והפרק תואם את התכנון וספר הזיכרון.`;
+**תחילת הפרק:**
+${text.substring(0, 3500)}
+
+approved=false אם הפרק נקטע באמצע משפט, חסר סיום, או קצר מ-900 מילים.
+approved=true רק אם אין בעיות severity גבוה, יש סיום מלא, והפרק תואם את התכנון וספר הזיכרון.`;
 
   const raw = await callGemini(prompt, '', 2000);
-  const review = parseJsonFromResponse(raw);
-  if (!review) return { approved: true, score: 7, issues: [] };
+  const review = parseJsonFromResponse(raw) || { approved: true, score: 7, issues: [] };
+  if (!review.issues) review.issues = [];
+
+  if (!endsWithCompleteSentence(text)) {
+    review.issues.push({ type: 'עלילה', description: 'הפרק נקטע באמצע — חסר סיום במשפט שלם', severity: 'גבוה' });
+  }
+  if (countWords(text) < 900) {
+    review.issues.push({ type: 'עלילה', description: `הפרק קצר מדי (${countWords(text)} מילים)`, severity: 'גבוה' });
+  }
+
   if (review.approved === undefined) {
-    review.approved = !review.issues?.some(i => i.severity === 'גבוה');
+    review.approved = !review.issues.some(i => i.severity === 'גבוה');
+  } else if (review.issues.some(i => i.severity === 'גבוה')) {
+    review.approved = false;
   }
   return review;
 }
@@ -1446,8 +1502,9 @@ async function fixChapter(text, review, idx, plan) {
     .map((i, n) => `${n + 1}. [${i.type}/${i.severity}] ${i.description}`)
     .join('\n');
 
-  const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך דומה (1800-2500 מילים), סגנון סנדרסוני, ומעברי [***].
-אל תשנה אירועים שלא קשורים לתיקון. החזר פרוזה מתוקנת בלבד — ללא כותרת, ללא הסברים.
+  const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך מלא (לפחות 1200 מילים), סגנון סנדרסוני, ומעברי [***].
+אם הפרק נקטע — השלם אותו עד סיום מלא עם hook. סיים תמיד במשפט שלם.
+אל תשנה אירועים שלא קשורים לתיקון. החזר את הפרק המלא בלבד — ללא כותרת, ללא הסברים.
 
 **בעיות לתיקון:**
 ${issuesList || 'שיפור עקביות כללי'}
@@ -1515,13 +1572,13 @@ ${chapterText.substring(0, 3000)}`;
   }
 }
 
-async function writeChapter(idx, plan) {
+function buildChapterContext(idx, plan) {
   const book = state.book;
   const outline = book.chapterOutlines[idx];
   const memoryContext = formatMemoryBookForPrompt();
 
   let eventLogContext = '';
-  if (idx > 0 && state.eventLog && state.eventLog.length > 0) {
+  if (idx > 0 && state.eventLog?.length) {
     eventLogContext = `**יומן אירועים — מה קרה עד כה:**\n${state.eventLog.join('\n\n')}`;
   }
 
@@ -1529,50 +1586,124 @@ async function writeChapter(idx, plan) {
   if (idx > 0 && state.chapters.length > 0) {
     const last = state.chapters[state.chapters.length - 1];
     const lines = last.text.split('\n').filter(l => l.trim()).slice(-4).join(' ');
-    lastChapterSnippet = `**שורות הסיום של הפרק הקודם (לרצף נרטיבי):**\n"${lines.substring(0, 500)}..."`;
+    lastChapterSnippet = `**שורות הסיום של הפרק הקודם:**\n"${lines.substring(0, 500)}..."`;
   }
 
-  const planContext = `**תכנון הפרק (עקוב אחריו):**
+  const planContext = `**תכנון הפרק:**
 מטרה: ${plan.chapterGoal || outline.summary}
 מיקוד POV: ${plan.povFocus || outline.pov}
-סצנות: ${(plan.scenes || []).map((s, i) => `${i + 1}. ${s.goal} @ ${s.location || '?'} — ${s.beat}`).join('\n')}
 חובות עקביות: ${(plan.continuityMust || []).join('; ') || '—'}
 תעלומות: ${(plan.mysteryHooks || []).join('; ') || '—'}
 קסם: ${plan.magicUse || book.magicSystem}`;
 
-  const prompt = `אתה ברנדון סנדרסון הכותב ספר פנטזיה אפי בעברית.
+  return { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext };
+}
 
-**פרטי הספר:**
-שם: ${book.title}
-עולם: ${book.world}
-מערכת קסם: ${book.magicSystem}
-דמויות ראשיות: ${book.mainCharacters?.map(c => `${c.name} (${c.role})`).join(', ')}
+async function continueProse(existing, instruction, maxTokens = 4096) {
+  const prompt = `המשך את הטקסט בעברית ספרותית — בדיוק מהנקודה שבה נעצר, בלי לחזור על פסקאות שכבר נכתבו.
+${instruction}
+סיים במשפט שלם (נקודה, סימן שאלה או קריאה).
 
-**פרק לכתיבה:**
-מספר: ${outline.number}
-כותרת: ${outline.title}
-תוכן: ${outline.summary}
-נקודת מבט: ${outline.pov}
+**סוף הטקסט עד כה:**
+"...${existing.trimEnd().slice(-2000)}"
+
+כתוב המשך בלבד — פרוזה, ללא כותרות והסברים.`;
+
+  const { text, finishReason } = await callGeminiRaw(prompt, '', maxTokens);
+  return { text: text.trim(), finishReason };
+}
+
+async function writeScene(idx, plan, sceneIndex, scene, priorInChapter, ctx, totalScenes) {
+  const { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext } = ctx;
+  const isFirst = sceneIndex === 0;
+  const isLast = sceneIndex === totalScenes - 1;
+  const targetMin = isLast ? 500 : 400;
+  const targetMax = isLast ? 700 : 600;
+
+  const bridge = priorInChapter
+    ? `**מה שכבר קרה בפרק הזה (אל תחזור על זה):**\n"...${priorInChapter.trimEnd().slice(-800)}..."\n\n`
+    : '';
+
+  const prompt = `אתה כותב ספר פנטזיה אפי בעברית בסגנון ברנדון סנדרסון.
+
+**ספר:** ${book.title} | **פרק ${outline.number}:** ${outline.title} | **POV:** ${outline.pov}
 
 ${memoryContext}
 
 ${planContext}
 
-${eventLogContext ? eventLogContext + '\n\n' : ''}${lastChapterSnippet ? lastChapterSnippet + '\n\n' : ''}**הנחיות:**
-- כתוב פרק שלם ומגובש בעברית ספרותית יפה
-- 1800-2500 מילים
-- שמור על רצף מלא עם הפרקים הקודמים — אל תסתור אירועים ביומן
-- שמור על עקביות מוחלטת עם ספר הזיכרון (דמויות, מקומות, קסם, תעלומות)
-- פתח עם scene מיידי — אל תפתח עם רקע
-- השתמש בדיאלוג, תיאורים חושניים ומתח
-- הגבר את מערכת הקסם בצורה אורגנית
-- סיים עם hook שמשאיר את הקורא מחכה לפרק הבא
-- חלק את הפרק ל-3-4 סצנות עם מעברים [***]
-- כתוב פרוזה בלבד — ללא כותרת, ללא מספר פרק, ללא הסברים`;
+${eventLogContext ? eventLogContext + '\n\n' : ''}${isFirst && lastChapterSnippet ? lastChapterSnippet + '\n\n' : ''}${bridge}**הסצנה הנוכחית (${sceneIndex + 1} מתוך ${totalScenes}):**
+מקום: ${scene.location || 'לפי ההקשר'}
+מטרה: ${scene.goal}
+מה קורה: ${scene.beat}
+דמויות: ${(scene.characters || []).join(', ') || outline.pov}
 
-  const text = await callGemini(prompt, '', 8192);
-  if (!text || text.length < 200) throw new Error('הפרק שהתקבל קצר מדי');
-  return text.trim();
+**הנחיות קריטיות:**
+- כתוב רק את הסצנה הזו — בערך ${targetMin}-${targetMax} מילים (לא פחות מ-${targetMin})
+- ${isFirst ? 'פתח באמצע פעולה — בלי הקדמת רקע ארוכה' : 'המשך ישירות מהחלק הקודם של הפרק'}
+- ${isLast ? 'סיים את הסצנה ואת הפרק ב-hook חזק — במשפט סגור וברור' : 'סיים את הסצנה במשפט שלם, לפני המעבר לסצנה הבאה'}
+- אל תכתוב [***] — המעבר יתווסף אוטומטית
+- פרוזה בלבד, ללא כותרות`;
+
+  let { text, finishReason } = await callGeminiRaw(prompt, '', 8192);
+  text = text.trim();
+
+  for (let c = 0; c < 2 && isOutputTruncated(text, finishReason, targetMin - 80); c++) {
+    const tailInstr = isLast
+      ? 'השלם את הסצנה האחרונה וסיים את הפרק ב-hook.'
+      : 'השלם את הסצנה עד סיום טבעי.';
+    const cont = await continueProse(text, tailInstr, 4096);
+    text = mergeContinuation(text, cont.text);
+    finishReason = cont.finishReason;
+  }
+
+  return text;
+}
+
+async function finalizeChapterEnding(fullText, idx, plan, ctx) {
+  if (endsWithCompleteSentence(fullText) && countWords(fullText) >= 1100) return fullText;
+
+  const { outline } = ctx;
+  const cont = await continueProse(
+    fullText,
+    `הפרק ${outline.number} ("${outline.title}") נקטע באמצע. כתוב את המשך וסיום הפרק בלבד — עוד 250-450 מילים, עם hook לפרק הבא.`,
+    6144
+  );
+  let merged = mergeContinuation(fullText, cont.text);
+  if (!endsWithCompleteSentence(merged)) {
+    const cont2 = await continueProse(merged, 'סיים במשפט אחד חזק וסגור — סיום הפרק.', 2048);
+    merged = mergeContinuation(merged, cont2.text);
+  }
+  return merged;
+}
+
+async function writeChapter(idx, plan, onSceneProgress) {
+  const ctx = buildChapterContext(idx, plan);
+  const { outline } = ctx;
+
+  const scenes = plan.scenes?.length
+    ? plan.scenes
+    : [{ goal: outline.summary, beat: outline.summary, location: '', characters: [outline.pov] }];
+
+  const parts = [];
+  let priorInChapter = '';
+
+  for (let i = 0; i < scenes.length; i++) {
+    if (onSceneProgress) onSceneProgress(i, scenes.length);
+    const sceneText = await writeScene(idx, plan, i, scenes[i], priorInChapter, ctx, scenes.length);
+    if (i > 0) parts.push('[***]');
+    parts.push(sceneText);
+    priorInChapter = parts.join('\n\n');
+  }
+
+  let full = parts.join('\n\n').trim();
+  full = await finalizeChapterEnding(full, idx, plan, ctx);
+
+  const words = countWords(full);
+  if (words < 900) throw new Error(`הפרק קצר מדי (${words} מילים) — נסה שוב`);
+  if (!endsWithCompleteSentence(full)) throw new Error('הפרק נסגר ללא סיום מלא — נסה שוב');
+
+  return full;
 }
 
 // ===== RENDER LIBRARY =====
