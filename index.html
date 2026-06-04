@@ -2968,9 +2968,69 @@ function showShelf() {
 }
 
 function openWelcomeNewBook() {
+  if (state.book && state.id) {
+    app.books[state.id] = bookSnapshot();
+    save();
+  }
   showScreen('welcome-screen');
   updateWelcomeShelfLink();
   document.getElementById('create-btn').disabled = false;
+}
+
+function clearChapterGenerationQueue() {
+  while (chapterGenQueue.length) {
+    const job = chapterGenQueue.shift();
+    job.rejects.forEach(r => r(new Error('בוטל — נפתח ספר חדש')));
+  }
+  chapterGenPumpActive = false;
+  state.writing = false;
+  state.generatingIdx = null;
+}
+
+/** ספר עצמאי חדש — מאפס state כדי שלא יישארו דמויות/זיכרון מהספר הקודם */
+function prepareStateForNewStandaloneBook(profile, lengthKey, apiKey) {
+  const previousBookId = state.book && state.id ? state.id : (app.currentBookId || null);
+  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+
+  clearChapterGenerationQueue();
+
+  const newId = newBookId();
+  state = createEmptyBookState();
+  state.id = newId;
+  state.apiKey = apiKey;
+  app.apiKey = apiKey;
+  state.bookProfile = profile;
+  state.readingLengthKey = lengthKey;
+  state.totalChapters = LENGTH_PRESETS[lengthKey]?.chapters || 15;
+  state.createdAt = Date.now();
+  state.memoryBook = emptyMemoryBook();
+  state.storySynopsis = '';
+  state.eventLog = [];
+  state.chapters = [];
+  state.parentBookId = null;
+  state.seriesTitle = '';
+  state.sequelIndex = 1;
+  app.currentBookId = state.id;
+  return previousBookId;
+}
+
+function restoreBookAfterFailedCreation(failedId, previousBookId, apiKey) {
+  if (failedId) delete app.books[failedId];
+  if (previousBookId && app.books[previousBookId]) {
+    applyBookSnapshot(app.books[previousBookId]);
+    app.currentBookId = previousBookId;
+  } else {
+    const ids = Object.keys(app.books || {});
+    if (ids.length) {
+      const id = ids[ids.length - 1];
+      applyBookSnapshot(app.books[id]);
+      app.currentBookId = id;
+    } else {
+      state = createEmptyBookState();
+      state.apiKey = apiKey;
+    }
+  }
+  save();
 }
 
 function updateWelcomeShelfLink() {
@@ -3295,14 +3355,7 @@ async function startBookCreation() {
     return;
   }
 
-  state.apiKey = apiKey;
-  app.apiKey = apiKey;
-  state.id = newBookId();
-  state.bookProfile = profile;
-  state.readingLengthKey = readingLengthKey;
-  state.totalChapters = LENGTH_PRESETS[readingLengthKey]?.chapters || 15;
-  state.createdAt = Date.now();
-  app.currentBookId = state.id;
+  const previousBookId = prepareStateForNewStandaloneBook(profile, readingLengthKey, apiKey);
   document.getElementById('create-btn').disabled = true;
   document.getElementById('welcome-error').style.display = 'none';
   showScreen('loading-screen');
@@ -3324,12 +3377,8 @@ async function startBookCreation() {
   try {
     const bookData = normalizeBlueprint(await createBookBlueprint());
     state.book = bookData;
-    state.chapters = [];
-    state.eventLog = [];
     state.memoryBook = initMemoryBookFromBlueprint(bookData);
     state.seriesTitle = bookData.title;
-    state.sequelIndex = 1;
-    state.parentBookId = null;
     app.books[state.id] = bookSnapshot();
     save();
 
@@ -3339,6 +3388,7 @@ async function startBookCreation() {
     await generateChapterAt(0, { openAfter: true, useLoadingScreen: true });
   } catch(e) {
     clearInterval(statusInterval);
+    restoreBookAfterFailedCreation(state.id, previousBookId, apiKey);
     document.getElementById('create-btn').disabled = false;
     showScreen('welcome-screen');
     showError('welcome-error', 'שגיאה ביצירת הספר: ' + e.message);
@@ -3351,6 +3401,8 @@ async function createBookBlueprint() {
   const genreLabel = genreDisplayLabel(getBookProfile());
 
   const prompt = `צור תוכנית לספר בעברית עם ${n} פרקים.
+
+**חשוב:** זהו ספר חדש ועצמאי לחלוטין — לא המשך לספר אחר, לא אותו עולם, לא אותן דמויות. צור עולם, דמויות ועלילה מקוריים לפי הבחירות בלבד.
 
 ${brief}
 
@@ -3564,6 +3616,9 @@ async function startSequelBook(sourceId, lengthKey) {
 
   const parentMem = deepClone(parent.memoryBook || emptyMemoryBook());
   const parentSynopsis = parent.storySynopsis || parent.eventLog?.join('\n\n') || '';
+
+  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+  clearChapterGenerationQueue();
 
   state = createEmptyBookState();
   state.id = newBookId();
