@@ -3931,10 +3931,11 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
     return;
   }
   if (state.writing) {
-    if (background) return;
+    if (background && state.generatingIdx === idx) return;
     await waitForGeneration();
     if (idx < state.chapters.length) {
       if (openAfter) openChapter(idx);
+      if (background) notifyReadingChapterPipeline(idx, false);
       return;
     }
     if (state.writing) return;
@@ -3950,6 +3951,8 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
     document.getElementById('write-next-btn').disabled = true;
     document.getElementById('writing-indicator').style.display = 'flex';
     document.getElementById('library-error').style.display = 'none';
+  } else {
+    notifyReadingChapterPipeline(idx, true);
   }
 
   try {
@@ -3994,12 +3997,14 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
     if (openAfter) openChapter(idx);
     else if (isReadingScreenActive()) refreshReadingEndActions();
 
+    notifyReadingChapterPipeline(idx, false);
     prefetchChapter(idx + 1);
 
   } catch(e) {
     state.writing = false;
     state.generatingIdx = null;
     save();
+    notifyReadingChapterPipeline(idx, false);
     if (!background) {
       document.getElementById('write-next-btn').disabled = false;
       document.getElementById('writing-indicator').style.display = 'none';
@@ -4015,9 +4020,35 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   }
 }
 
+function notifyReadingChapterPipeline(generatingIdx, active) {
+  if (!isReadingScreenActive()) return;
+  const cur = state.currentReadingChapter;
+  if (cur == null || generatingIdx !== cur + 1) return;
+  if (active) {
+    showReadingPreparing(true, `מכין את פרק ${generatingIdx + 1}...`);
+    renderReadingNav(cur);
+  } else {
+    showReadingPreparing(false);
+    renderReadingNav(cur);
+  }
+}
+
 function prefetchChapter(idx) {
-  if (idx >= state.totalChapters || idx < state.chapters.length || state.writing) return;
-  generateChapterAt(idx, { background: true }).catch(() => {});
+  if (idx >= state.totalChapters || idx < state.chapters.length) return;
+  generateChapterAt(idx, { background: true }).catch((err) => {
+    console.warn('prefetch chapter', idx + 1, err);
+    if (isReadingScreenActive() && state.currentReadingChapter === idx - 1) {
+      showReadingPreparing(false);
+      renderReadingNav(state.currentReadingChapter);
+    }
+  });
+}
+
+function getReadingContinuationIndex() {
+  if (isReadingScreenActive() && state.currentReadingChapter != null) {
+    return state.currentReadingChapter;
+  }
+  return state.lastReadChapter ?? 0;
 }
 
 async function readNextChapter() {
@@ -4027,7 +4058,7 @@ async function readNextChapter() {
     try { await generateChapterAt(0, { openAfter: true }); } catch(e) {}
     return;
   }
-  const last = state.lastReadChapter ?? 0;
+  const last = getReadingContinuationIndex();
   const nextToRead = last + 1;
   if (nextToRead < written) {
     openChapter(nextToRead);
@@ -4073,8 +4104,9 @@ async function continueFromChapter(currentIdx) {
 
 function refreshReadingEndActions() {
   const idx = state.currentReadingChapter;
+  if (idx == null) return;
+  showReadingPreparing(false);
   renderReadingNav(idx);
-  if (state.chapters[idx]) openChapter(idx);
 }
 
 async function planChapter(idx) {
@@ -4464,7 +4496,7 @@ function renderLibrary() {
     if (isWritten) {
       const capturedIdx = i;
       btn.onclick = () => openChapter(capturedIdx);
-    } else if (isNext && !state.writing) {
+    } else if (isNext) {
       btn.onclick = () => readNextChapter();
     }
 
