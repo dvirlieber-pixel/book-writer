@@ -760,6 +760,16 @@
     color: var(--gold-dim);
   }
   .api-key-status.saved { color: var(--success-text); }
+  .model-fallback-notice {
+    font-size: 0.78rem;
+    margin-top: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    background: rgba(201, 168, 76, 0.1);
+    border: 1px solid rgba(201, 168, 76, 0.28);
+    color: var(--gold-dim);
+    line-height: 1.5;
+    border-radius: 1px;
+  }
   .api-key-row {
     display: flex;
     gap: 0.5rem;
@@ -1784,6 +1794,7 @@
           <button type="button" class="api-show-key-btn" onclick="toggleApiKeyVisibility()">הצג</button>
         </div>
         <div class="api-key-status" id="api-key-status"></div>
+        <div class="model-fallback-notice" id="welcome-model-fallback-notice" style="display:none" role="status"></div>
       </div>
     </details>
 
@@ -1921,6 +1932,7 @@
         <span id="writing-status-text">מכין את הפרק...</span>
       </div>
       <div class="library-actions" id="library-actions"></div>
+      <div class="model-fallback-notice" id="library-model-fallback-notice" style="display:none" role="status"></div>
       <div id="library-error" class="error-msg" style="display:none"></div>
     </div>
   </div>
@@ -2033,6 +2045,14 @@ let bookCreationInFlight = false;
 /** פרוזה — 3.5 Flash; Lite — 3.1 Flash-Lite לתכנון, זיכרון, סיכומים */
 const GEMINI_MODEL_PROSE = 'gemini-3.5-flash';
 const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite';
+const GEMINI_MODEL_FLASH_FALLBACK = 'gemini-2.5-flash';
+const GEMINI_PROSE_MODEL_CHAIN = [GEMINI_MODEL_PROSE, GEMINI_MODEL_FLASH_FALLBACK];
+const GEMINI_LITE_MODEL_CHAIN = [GEMINI_MODEL_LITE, GEMINI_MODEL_FLASH_FALLBACK];
+const GEMINI_MODEL_LABELS = {
+  'gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite',
+  'gemini-2.5-flash': 'Gemini 2.5 Flash',
+  'gemini-3.5-flash': 'Gemini 3.5 Flash'
+};
 const GEMINI_RATE_LIMITS_URL = 'https://aistudio.google.com/usage';
 
 const DEFAULT_TASTE_PROFILES = [
@@ -3493,7 +3513,46 @@ function normalizeApiError(e, status, apiMessage) {
   return e;
 }
 
-async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE) {
+function isModelNotFoundError(e, httpStatus) {
+  if (httpStatus === 404 || e?.status === 404) return true;
+  const m = (e?.message || '').toLowerCase();
+  return /404|not found|not_found|invalid model|unknown model|does not exist|is not supported|no longer available/.test(m);
+}
+
+function setModelFallback(appKey, activeModelId) {
+  if (app[appKey] === activeModelId) return;
+  app[appKey] = activeModelId;
+  save();
+  refreshModelFallbackNotice();
+}
+
+function clearModelFallbackIfPrimary(appKey, primaryModel) {
+  if (!app[appKey]) return;
+  delete app[appKey];
+  save();
+  refreshModelFallbackNotice();
+}
+
+function refreshModelFallbackNotice() {
+  const parts = [];
+  if (app.liteModelFallback && app.liteModelFallback !== GEMINI_MODEL_LITE) {
+    parts.push(
+      `${GEMINI_MODEL_LABELS[GEMINI_MODEL_LITE]} לא זמין בפרויקט — משתמשים ב-${GEMINI_MODEL_LABELS[app.liteModelFallback] || app.liteModelFallback} לתכנון, זיכרון וסיכומים.`
+    );
+  }
+  if (app.proseModelFallback && app.proseModelFallback !== GEMINI_MODEL_PROSE) {
+    parts.push(
+      `${GEMINI_MODEL_LABELS[GEMINI_MODEL_PROSE]} לא זמין בפרויקט — משתמשים ב-${GEMINI_MODEL_LABELS[app.proseModelFallback] || app.proseModelFallback} לכתיבת פרקים.`
+    );
+  }
+  const msg = parts.join('\n\n');
+  document.querySelectorAll('.model-fallback-notice').forEach(el => {
+    el.textContent = msg;
+    el.style.display = msg ? 'block' : 'none';
+  });
+}
+
+async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE) {
   const delay = ms => new Promise(res => setTimeout(res, ms));
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -3526,6 +3585,12 @@ async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4
         const err = await response.json().catch(() => ({}));
         const msg = err?.error?.message || `שגיאת API: ${response.status}`;
         if (isQuotaApiError(response.status, msg)) throw quotaExceededError(msg);
+        if (response.status === 404 || isModelNotFoundError(null, response.status)) {
+          const e = new Error(msg);
+          e.status = 404;
+          e.modelNotFound = true;
+          throw e;
+        }
         throw new Error(msg);
       }
 
@@ -3537,6 +3602,7 @@ async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4
       };
 
     } catch(e) {
+      if (e.modelNotFound || isModelNotFoundError(e, e.status)) throw e;
       if (e.message && e.message.includes('הגעת למכסה החינמית')) throw e;
       if (isQuotaApiError(null, e.message)) throw quotaExceededError(e.message);
       if (attempt < retries && (e.message.includes('503') || e.message.includes('fetch'))) {
@@ -3550,13 +3616,45 @@ async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4
   throw new Error('השרת עמוס מדי — נסה שוב מאוחר יותר');
 }
 
+async function callGeminiRawWithModelChain(chain, appKey, primaryModel, prompt, systemPrompt, maxTokens, retries) {
+  let lastErr;
+  const chainLabel = chain === GEMINI_LITE_MODEL_CHAIN ? 'Lite' : 'כתיבה';
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
+    try {
+      const result = await callGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model);
+      if (i > 0) setModelFallback(appKey, model);
+      else clearModelFallbackIfPrimary(appKey, primaryModel);
+      return result;
+    } catch (e) {
+      lastErr = e;
+      if (isModelNotFoundError(e, e.status) && i < chain.length - 1) continue;
+      throw e;
+    }
+  }
+  const tried = chain.map(m => GEMINI_MODEL_LABELS[m] || m).join(' / ');
+  throw new Error(`מודלי ${chainLabel} לא זמינים (${tried}) — בדוק ב-Google AI Studio אילו מודלים פעילים בפרויקט.`);
+}
+
+async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE) {
+  if (model !== GEMINI_MODEL_PROSE) {
+    return callGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model);
+  }
+  return callGeminiRawWithModelChain(
+    GEMINI_PROSE_MODEL_CHAIN, 'proseModelFallback', GEMINI_MODEL_PROSE, prompt, systemPrompt, maxTokens, retries
+  );
+}
+
 async function callGemini(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE) {
   const { text } = await callGeminiRaw(prompt, systemPrompt, maxTokens, retries, model);
   return text;
 }
 
 async function callGeminiLite(prompt, systemPrompt = '', maxTokens = 4096) {
-  return callGemini(prompt, systemPrompt, maxTokens, 4, GEMINI_MODEL_LITE);
+  const { text } = await callGeminiRawWithModelChain(
+    GEMINI_LITE_MODEL_CHAIN, 'liteModelFallback', GEMINI_MODEL_LITE, prompt, systemPrompt, maxTokens, 4
+  );
+  return text;
 }
 
 function countWords(text) {
@@ -4903,6 +5001,7 @@ if (app.apiKey || state.apiKey) {
   if (keyInput) keyInput.value = app.apiKey || state.apiKey;
 }
 updateApiKeyStatus();
+refreshModelFallbackNotice();
 const apiDetails = document.getElementById('api-settings-details');
 if (apiDetails && !getStoredApiKey()) apiDetails.open = true;
 
