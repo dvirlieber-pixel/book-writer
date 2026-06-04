@@ -2015,6 +2015,7 @@ let shelfFilter = 'all';
 let shelfSort = 'recent';
 const chapterGenQueue = [];
 let chapterGenPumpActive = false;
+let bookCreationInFlight = false;
 
 const DEFAULT_TASTE_PROFILES = [
   { id: 'epic', name: 'אפי ארוך', genre: 'fantasy', tone: 'classic', lengthKey: 'long' },
@@ -3011,10 +3012,17 @@ function prepareStateForNewStandaloneBook(profile, lengthKey, apiKey) {
   state.seriesTitle = '';
   state.sequelIndex = 1;
   app.currentBookId = state.id;
+  markPendingCreation('blueprint', {
+    kind: 'standalone',
+    previousBookId,
+    profile,
+    readingLengthKey: lengthKey
+  });
   return previousBookId;
 }
 
 function restoreBookAfterFailedCreation(failedId, previousBookId, apiKey) {
+  clearPendingCreation();
   if (failedId) delete app.books[failedId];
   if (previousBookId && app.books[previousBookId]) {
     applyBookSnapshot(app.books[previousBookId]);
@@ -3031,6 +3039,201 @@ function restoreBookAfterFailedCreation(failedId, previousBookId, apiKey) {
     }
   }
   save();
+}
+
+// ===== יצירת ספר — שמירה והמשך אחרי יציאה מהאפליקציה =====
+let creationResumeRunning = false;
+
+const LOADING_STATUS_MESSAGES = [
+  'בוחר את שולחן הכתיבה...',
+  'מכין את ההגדרה...',
+  'מייצר דמויות...',
+  'מתכנן את העלילה...',
+  'מסדר את תוכן העניינים...'
+];
+
+function startLoadingStatusRotation() {
+  let si = 0;
+  const el = document.getElementById('loading-status');
+  if (el) el.textContent = LOADING_STATUS_MESSAGES[0];
+  return setInterval(() => {
+    si = (si + 1) % LOADING_STATUS_MESSAGES.length;
+    if (el) el.textContent = LOADING_STATUS_MESSAGES[si];
+  }, 2000);
+}
+
+function markPendingCreation(phase, extras = {}) {
+  app.pendingCreation = {
+    bookId: state.id,
+    phase,
+    kind: extras.kind || 'standalone',
+    previousBookId: extras.previousBookId ?? null,
+    parentBookId: extras.parentBookId ?? null,
+    profile: extras.profile != null ? deepClone(extras.profile) : deepClone(state.bookProfile || defaultBookProfile()),
+    readingLengthKey: state.readingLengthKey || extras.readingLengthKey || 'short',
+    startedAt: app.pendingCreation?.startedAt || Date.now()
+  };
+  save();
+}
+
+function clearPendingCreation() {
+  if (!app.pendingCreation) return;
+  delete app.pendingCreation;
+  save();
+}
+
+function sanitizePendingCreation() {
+  const p = app.pendingCreation;
+  if (!p?.bookId || !p.phase) {
+    clearPendingCreation();
+    return null;
+  }
+  const snap = app.books[p.bookId];
+  if (snap?.chapters?.length > 0) {
+    clearPendingCreation();
+    return null;
+  }
+  if (p.phase === 'chapter0' && !snap?.book) p.phase = 'blueprint';
+  return p;
+}
+
+function applyPendingCreationState(pending, apiKey) {
+  const snap = app.books[pending.bookId];
+  if (snap) {
+    applyBookSnapshot(snap);
+    app.currentBookId = pending.bookId;
+  } else {
+    state = createEmptyBookState();
+    state.id = pending.bookId;
+    state.bookProfile = pending.profile || defaultBookProfile();
+    state.readingLengthKey = pending.readingLengthKey || 'short';
+    state.totalChapters = LENGTH_PRESETS[state.readingLengthKey]?.chapters || 15;
+    state.createdAt = pending.startedAt || Date.now();
+    state.memoryBook = emptyMemoryBook();
+    app.currentBookId = pending.bookId;
+  }
+  state.apiKey = apiKey;
+  app.apiKey = apiKey;
+}
+
+async function finishNewBookChapterZero(pending) {
+  document.getElementById('loading-status').textContent = 'מכין את הפרק הראשון...';
+  await generateChapterAt(0, { openAfter: true, useLoadingScreen: true });
+  clearPendingCreation();
+  save();
+  document.getElementById('create-btn').disabled = false;
+  if (pending?.kind === 'sequel') {
+    document.getElementById('loading-title').textContent = 'פותח ספר חדש...';
+  }
+}
+
+async function runResumeBlueprint(pending) {
+  const apiKey = getStoredApiKey();
+  if (!apiKey || !navigator.onLine) return false;
+
+  applyPendingCreationState(pending, apiKey);
+  app.currentBookId = pending.bookId;
+
+  showScreen('loading-screen');
+  document.getElementById('loading-title').textContent =
+    pending.kind === 'sequel' ? 'ממשיך לפתוח המשך...' : 'ממשיך ליצור את הספר...';
+  document.getElementById('create-btn').disabled = true;
+
+  const statusInterval = startLoadingStatusRotation();
+  bookCreationInFlight = true;
+  try {
+    let bookData;
+    if (pending.kind === 'sequel' && pending.parentBookId) {
+      const parent = app.books[pending.parentBookId];
+      if (!parent?.book) throw new Error('ספר המקור לא נמצא');
+      bookData = normalizeBlueprint(await createSequelBlueprint(parent));
+      state.memoryBook = deepClone(parent.memoryBook || emptyMemoryBook());
+    } else {
+      bookData = normalizeBlueprint(await createBookBlueprint());
+      state.memoryBook = initMemoryBookFromBlueprint(bookData);
+    }
+    state.book = bookData;
+    state.seriesTitle = bookData.title;
+    app.books[state.id] = bookSnapshot();
+    markPendingCreation('chapter0', {
+      kind: pending.kind,
+      previousBookId: pending.previousBookId,
+      parentBookId: pending.parentBookId,
+      profile: pending.profile,
+      readingLengthKey: pending.readingLengthKey
+    });
+
+    clearInterval(statusInterval);
+    renderLibrary();
+    await finishNewBookChapterZero(pending);
+    return true;
+  } catch (e) {
+    clearInterval(statusInterval);
+    if (pending.kind === 'sequel' && pending.parentBookId && app.books[pending.parentBookId]) {
+      delete app.books[pending.bookId];
+      applyBookSnapshot(app.books[pending.parentBookId]);
+      app.currentBookId = pending.parentBookId;
+      clearPendingCreation();
+      save();
+      showScreen('library-screen');
+      showError('library-error', 'לא הצלחנו להמשיך את יצירת הספר: ' + e.message);
+    } else {
+      restoreBookAfterFailedCreation(pending.bookId, pending.previousBookId, apiKey);
+      showScreen('welcome-screen');
+      showError('welcome-error', 'לא הצלחנו להמשיך את יצירת הספר: ' + e.message);
+    }
+    document.getElementById('create-btn').disabled = false;
+    return true;
+  } finally {
+    bookCreationInFlight = false;
+  }
+}
+
+async function runResumeChapter0(pending) {
+  const apiKey = getStoredApiKey();
+  if (!apiKey || !navigator.onLine) return false;
+
+  applyPendingCreationState(pending, apiKey);
+  if (!state.book) return runResumeBlueprint(pending);
+
+  showScreen('loading-screen');
+  document.getElementById('loading-title').textContent =
+    pending.kind === 'sequel' ? 'ממשיך לפתוח המשך...' : 'ממשיך ליצור את הספר...';
+
+  bookCreationInFlight = true;
+  try {
+    renderLibrary();
+    await finishNewBookChapterZero(pending);
+    return true;
+  } catch (e) {
+    if (pending.kind === 'sequel' && pending.parentBookId && app.books[pending.parentBookId]) {
+      showScreen('library-screen');
+      showError('library-error', 'לא הצלחנו להמשיך את הפרק הראשון: ' + e.message);
+    } else {
+      showScreen('welcome-screen');
+      showError('welcome-error', 'לא הצלחנו להמשיך את הפרק הראשון: ' + e.message);
+    }
+    document.getElementById('create-btn').disabled = false;
+    return true;
+  } finally {
+    bookCreationInFlight = false;
+  }
+}
+
+async function tryResumePendingCreation() {
+  if (creationResumeRunning || state.writing || bookCreationInFlight) return false;
+  const pending = sanitizePendingCreation();
+  if (!pending) return false;
+
+  creationResumeRunning = true;
+  try {
+    if (pending.phase === 'blueprint') return await runResumeBlueprint(pending);
+    if (pending.phase === 'chapter0') return await runResumeChapter0(pending);
+    clearPendingCreation();
+    return false;
+  } finally {
+    creationResumeRunning = false;
+  }
 }
 
 function updateWelcomeShelfLink() {
@@ -3359,20 +3562,10 @@ async function startBookCreation() {
   document.getElementById('create-btn').disabled = true;
   document.getElementById('welcome-error').style.display = 'none';
   showScreen('loading-screen');
+  document.getElementById('loading-title').textContent = 'פותח ספר חדש...';
 
-  const statuses = [
-    'בוחר את שולחן הכתיבה...',
-    'מכין את ההגדרה...',
-    'מייצר דמויות...',
-    'מתכנן את העלילה...',
-    'מסדר את תוכן העניינים...'
-  ];
-
-  let si = 0;
-  const statusInterval = setInterval(() => {
-    si = (si + 1) % statuses.length;
-    document.getElementById('loading-status').textContent = statuses[si];
-  }, 2000);
+  const statusInterval = startLoadingStatusRotation();
+  bookCreationInFlight = true;
 
   try {
     const bookData = normalizeBlueprint(await createBookBlueprint());
@@ -3380,18 +3573,24 @@ async function startBookCreation() {
     state.memoryBook = initMemoryBookFromBlueprint(bookData);
     state.seriesTitle = bookData.title;
     app.books[state.id] = bookSnapshot();
-    save();
+    markPendingCreation('chapter0', {
+      kind: 'standalone',
+      previousBookId,
+      profile,
+      readingLengthKey: readingLengthKey
+    });
 
     clearInterval(statusInterval);
     renderLibrary();
-    document.getElementById('loading-status').textContent = 'מכין את הפרק הראשון...';
-    await generateChapterAt(0, { openAfter: true, useLoadingScreen: true });
+    await finishNewBookChapterZero({ kind: 'standalone' });
   } catch(e) {
     clearInterval(statusInterval);
     restoreBookAfterFailedCreation(state.id, previousBookId, apiKey);
     document.getElementById('create-btn').disabled = false;
     showScreen('welcome-screen');
     showError('welcome-error', 'שגיאה ביצירת הספר: ' + e.message);
+  } finally {
+    bookCreationInFlight = false;
   }
 }
 
@@ -3636,32 +3835,46 @@ async function startSequelBook(sourceId, lengthKey) {
   state.eventLog = [];
   state.chapters = [];
   app.currentBookId = state.id;
+  markPendingCreation('blueprint', {
+    kind: 'sequel',
+    previousBookId: parent.id,
+    parentBookId: parent.id,
+    profile: state.bookProfile,
+    readingLengthKey: lk
+  });
 
   document.getElementById('create-btn').disabled = true;
   showScreen('loading-screen');
   document.getElementById('loading-title').textContent = 'פותח המשך בעולם הזה...';
   document.getElementById('loading-status').textContent = 'בונה על הסיפור הקודם...';
+  bookCreationInFlight = true;
 
   try {
     const bookData = normalizeBlueprint(await createSequelBlueprint(parent));
     state.book = bookData;
     state.memoryBook = parentMem;
     app.books[state.id] = bookSnapshot();
-    save();
+    markPendingCreation('chapter0', {
+      kind: 'sequel',
+      previousBookId: parent.id,
+      parentBookId: parent.id,
+      profile: state.bookProfile,
+      readingLengthKey: lk
+    });
 
     renderLibrary();
-    document.getElementById('loading-status').textContent = 'מכין את הפרק הראשון...';
-    await generateChapterAt(0, { openAfter: true, useLoadingScreen: true });
-    document.getElementById('loading-title').textContent = 'פותח ספר חדש...';
-    document.getElementById('create-btn').disabled = false;
+    await finishNewBookChapterZero({ kind: 'sequel' });
   } catch(e) {
     document.getElementById('create-btn').disabled = false;
+    clearPendingCreation();
     delete app.books[state.id];
     applyBookSnapshot(parent);
     app.currentBookId = parent.id;
     save();
     showScreen('library-screen');
     showError('library-error', 'שגיאה ביצירת ספר המשך: ' + e.message);
+  } finally {
+    bookCreationInFlight = false;
   }
 }
 
@@ -4538,8 +4751,20 @@ window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') releaseWakeLock();
-  else enforceOrientationPolicy();
+  if (document.visibilityState === 'hidden') {
+    releaseWakeLock();
+    if (app.pendingCreation || state.writing) save();
+  } else {
+    enforceOrientationPolicy();
+    if (app.pendingCreation && !state.writing && !creationResumeRunning && !bookCreationInFlight) {
+      tryResumePendingCreation();
+    }
+  }
+});
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted && app.pendingCreation && !state.writing && !creationResumeRunning && !bookCreationInFlight) {
+    tryResumePendingCreation();
+  }
 });
 window.addEventListener('orientationchange', updateLandscapeToggleButton);
 const inspirationPanel = document.getElementById('inspiration-panel');
@@ -4573,7 +4798,11 @@ function bootstrapAppScreens() {
   }
 }
 
-initDLSplash(bootstrapAppScreens);
+initDLSplash(() => {
+  tryResumePendingCreation().then(resumed => {
+    if (!resumed) bootstrapAppScreens();
+  });
+});
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeChapterDrawer();
