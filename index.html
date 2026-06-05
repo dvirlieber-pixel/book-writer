@@ -386,6 +386,22 @@
     100% { transform: translateX(250%); }
   }
 
+  .loading-cancel-btn {
+    margin-top: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 0.55rem 1.25rem;
+    cursor: pointer;
+    border-radius: 1px;
+  }
+  .loading-cancel-btn:hover {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+  }
+
   /* ===== LIBRARY SCREEN ===== */
   #library-screen {
     flex-direction: column;
@@ -1881,6 +1897,7 @@
   <div class="loading-title">פותח ספר חדש...</div>
   <div class="loading-status" id="loading-status">מכין את הספר...</div>
   <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+  <button type="button" class="loading-cancel-btn" id="loading-cancel-btn" onclick="cancelPendingBookCreation()">ביטול — חזרה לספרייה</button>
 </div>
 
 <!-- LIBRARY SCREEN -->
@@ -3080,6 +3097,7 @@ function restoreBookAfterFailedCreation(failedId, previousBookId, apiKey) {
 
 // ===== יצירת ספר — שמירה והמשך אחרי יציאה מהאפליקציה =====
 let creationResumeRunning = false;
+const PENDING_AUTO_RESUME_MS = 30 * 60 * 1000;
 
 const LOADING_STATUS_MESSAGES = [
   'בוחר את שולחן הכתיבה...',
@@ -3119,7 +3137,65 @@ function clearPendingCreation() {
   save();
 }
 
+function abandonPendingCreationToLibrary() {
+  const pending = app.pendingCreation;
+  const bookId = pending?.bookId || state.id;
+  clearPendingCreation();
+  bookCreationInFlight = false;
+  creationResumeRunning = false;
+  state.writing = false;
+  state.generatingIdx = null;
+  clearChapterGenerationQueue();
+  document.getElementById('create-btn').disabled = false;
+
+  if (bookId && app.books[bookId]?.book) {
+    applyBookSnapshot(app.books[bookId]);
+    app.currentBookId = bookId;
+    state.apiKey = app.apiKey || state.apiKey;
+    save();
+    renderLibrary();
+    showScreen('library-screen');
+    return;
+  }
+  if (bookId && app.books[bookId]) {
+    delete app.books[bookId];
+    save();
+  }
+  if (shelfCount() > 0) {
+    renderShelf();
+    showScreen('shelf-screen');
+  } else {
+    showScreen('welcome-screen');
+  }
+}
+
+function cancelPendingBookCreation() {
+  if (!confirm('לבטל את ההכנה ולחזור לספרייה? אפשר להמשיך לקרוא/לכתוב את הפרק הראשון משם.')) return;
+  abandonPendingCreationToLibrary();
+}
+
+function expirePendingCreationIfStale() {
+  const p = app.pendingCreation;
+  if (!p?.startedAt) return false;
+  if (Date.now() - p.startedAt <= PENDING_AUTO_RESUME_MS) return false;
+  const bookId = p.bookId;
+  clearPendingCreation();
+  bookCreationInFlight = false;
+  state.writing = false;
+  state.generatingIdx = null;
+  clearChapterGenerationQueue();
+  document.getElementById('create-btn').disabled = false;
+  if (bookId && app.books[bookId]) {
+    applyBookSnapshot(app.books[bookId]);
+    app.currentBookId = bookId;
+    state.apiKey = app.apiKey || state.apiKey;
+    save();
+  }
+  return true;
+}
+
 function sanitizePendingCreation() {
+  if (expirePendingCreationIfStale()) return null;
   const p = app.pendingCreation;
   if (!p?.bookId || !p.phase) {
     clearPendingCreation();
@@ -3206,12 +3282,20 @@ async function runResumeBlueprint(pending) {
     return true;
   } catch (e) {
     clearInterval(statusInterval);
+    document.getElementById('create-btn').disabled = false;
+    clearPendingCreation();
     if (pending.kind === 'sequel' && pending.parentBookId && app.books[pending.parentBookId]) {
       delete app.books[pending.bookId];
       applyBookSnapshot(app.books[pending.parentBookId]);
       app.currentBookId = pending.parentBookId;
-      clearPendingCreation();
       save();
+      showScreen('library-screen');
+      showError('library-error', 'לא הצלחנו להמשיך את יצירת הספר: ' + e.message);
+    } else if (app.books[pending.bookId]?.book) {
+      applyBookSnapshot(app.books[pending.bookId]);
+      app.currentBookId = pending.bookId;
+      save();
+      renderLibrary();
       showScreen('library-screen');
       showError('library-error', 'לא הצלחנו להמשיך את יצירת הספר: ' + e.message);
     } else {
@@ -3219,7 +3303,6 @@ async function runResumeBlueprint(pending) {
       showScreen('welcome-screen');
       showError('welcome-error', 'לא הצלחנו להמשיך את יצירת הספר: ' + e.message);
     }
-    document.getElementById('create-btn').disabled = false;
     return true;
   } finally {
     bookCreationInFlight = false;
@@ -3243,14 +3326,22 @@ async function runResumeChapter0(pending) {
     await finishNewBookChapterZero(pending);
     return true;
   } catch (e) {
-    if (pending.kind === 'sequel' && pending.parentBookId && app.books[pending.parentBookId]) {
+    document.getElementById('create-btn').disabled = false;
+    clearPendingCreation();
+    if (app.books[pending.bookId]?.book) {
+      applyBookSnapshot(app.books[pending.bookId]);
+      app.currentBookId = pending.bookId;
+      save();
+      renderLibrary();
+      showScreen('library-screen');
+      showError('library-error', 'לא הצלחנו להמשיך את הפרק הראשון: ' + e.message);
+    } else if (pending.kind === 'sequel' && pending.parentBookId && app.books[pending.parentBookId]) {
       showScreen('library-screen');
       showError('library-error', 'לא הצלחנו להמשיך את הפרק הראשון: ' + e.message);
     } else {
       showScreen('welcome-screen');
       showError('welcome-error', 'לא הצלחנו להמשיך את הפרק הראשון: ' + e.message);
     }
-    document.getElementById('create-btn').disabled = false;
     return true;
   } finally {
     bookCreationInFlight = false;
@@ -5020,6 +5111,7 @@ function bootstrapAppScreens() {
 }
 
 initDLSplash(() => {
+  expirePendingCreationIfStale();
   tryResumePendingCreation().then(resumed => {
     if (!resumed) bootstrapAppScreens();
   });
