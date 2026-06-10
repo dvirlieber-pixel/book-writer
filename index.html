@@ -3248,7 +3248,8 @@ async function runResumeBlueprint(pending) {
   app.currentBookId = pending.bookId;
 
   showScreen('loading-screen');
-  document.getElementById('loading-title').textContent =
+  const ltEl = document.getElementById('loading-title');
+if (ltEl) ltEl.textContent =
     pending.kind === 'sequel' ? 'ממשיך לפתוח המשך...' : 'ממשיך ליצור את הספר...';
   document.getElementById('create-btn').disabled = true;
 
@@ -3317,7 +3318,8 @@ async function runResumeChapter0(pending) {
   if (!state.book) return runResumeBlueprint(pending);
 
   showScreen('loading-screen');
-  document.getElementById('loading-title').textContent =
+  const ltEl = document.getElementById('loading-title');
+if (ltEl) ltEl.textContent =
     pending.kind === 'sequel' ? 'ממשיך לפתוח המשך...' : 'ממשיך ליצור את הספר...';
 
   bookCreationInFlight = true;
