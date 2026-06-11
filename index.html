@@ -3858,6 +3858,9 @@ async function callGeminiLite(prompt, systemPrompt = '', maxTokens = 4096, optio
   return text;
 }
 
+const MIN_CHAPTER_WORDS = 900;
+const PROSE_EXTEND_MAX_ROUNDS = 4;
+
 function countWords(text) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -3865,7 +3868,24 @@ function countWords(text) {
 function endsWithCompleteSentence(text) {
   const t = text.trim();
   if (!t) return false;
+  if (/\.{3}\s*$/.test(t)) return false;
   return /[.!?…]["'»”]?\s*$/.test(t) || /[.!?…]["'»”]?$/.test(t.slice(-4));
+}
+
+function isChapterTextValid(text) {
+  return countWords(text) >= MIN_CHAPTER_WORDS && endsWithCompleteSentence(text);
+}
+
+function chapterValidationError(text) {
+  const words = countWords(text);
+  if (words < MIN_CHAPTER_WORDS) return `הפרק קצר מדי (${words} מילים)`;
+  if (!endsWithCompleteSentence(text)) return 'הפרק נסגר ללא סיום מלא';
+  return null;
+}
+
+function assertChapterTextValid(text) {
+  const err = chapterValidationError(text);
+  if (err) throw new Error(`${err} — נסה שוב`);
 }
 
 function isOutputTruncated(text, finishReason, minWords) {
@@ -3882,9 +3902,11 @@ function mergeContinuation(existing, continuation) {
   const tail = existing.trimEnd();
   const head = continuation.trimStart();
   if (!head) return tail;
-  if (head.startsWith(tail.slice(-Math.min(80, tail.length)))) return tail;
   const overlap = 120;
   const tailBit = tail.slice(-overlap);
+  if (tailBit.length > 20 && head.startsWith(tailBit)) {
+    return tail + head.slice(tailBit.length);
+  }
   if (head.includes(tailBit) && tailBit.length > 20) {
     const idx = head.indexOf(tailBit);
     return tail + head.slice(idx + tailBit.length);
@@ -4264,16 +4286,44 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
     const onScene = (si, total) => {
       setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum}, חלק ${si + 1}/${total})...`, useLoadingScreen);
     };
-    let text = await writeChapter(idx, plan, onScene);
+
+    let text = null;
+    let lastWriteErr;
+    for (let writeAttempt = 0; writeAttempt < 2; writeAttempt++) {
+      try {
+        text = await writeChapter(idx, plan, onScene);
+        break;
+      } catch (e) {
+        lastWriteErr = e;
+        if (writeAttempt < 1) {
+          setPreparingStatus(`מנסה שוב לכתוב את פרק ${chapterNum}...`, useLoadingScreen);
+        }
+      }
+    }
+    if (!text) throw lastWriteErr;
+
+    let validatedText = text;
 
     setPreparingStatus(`מוודא שהפרק ${chapterNum} מוכן...`, useLoadingScreen);
     let review = await reviewChapter(text, idx, plan);
     let fixAttempts = 0;
     while (!review.approved && fixAttempts < 2) {
       setPreparingStatus(`מלטש את פרק ${chapterNum}...`, useLoadingScreen);
-      text = await fixChapter(text, review, idx, plan);
+      const candidate = await fixChapter(text, review, idx, plan);
+      if (isChapterTextValid(candidate)) {
+        text = candidate;
+        validatedText = candidate;
+      }
       review = await reviewChapter(text, idx, plan);
       fixAttempts++;
+    }
+
+    if (!isChapterTextValid(text)) {
+      if (isChapterTextValid(validatedText)) {
+        text = validatedText;
+      } else {
+        assertChapterTextValid(text);
+      }
     }
 
     state.chapters.push({ title: sanitizeChapterTitle(outline.title, chapterNum), text, number: chapterNum });
@@ -4522,7 +4572,7 @@ ${text.slice(-1200)}
 **תחילת הפרק:**
 ${text.substring(0, 3500)}
 
-approved=false אם הפרק נקטע באמצע משפט, חסר סיום, או קצר מ-900 מילים.
+approved=false אם הפרק נקטע באמצע משפט, חסר סיום, או קצר מ-${MIN_CHAPTER_WORDS} מילים.
 approved=true רק אם אין בעיות severity גבוה, יש סיום מלא, והפרק תואם את התכנון וספר הזיכרון.`;
 
   const { text: reviewRaw } = await callGeminiLiteRaw(prompt, '', 2000, { jsonMode: true });
@@ -4532,7 +4582,7 @@ approved=true רק אם אין בעיות severity גבוה, יש סיום מל�
   if (!endsWithCompleteSentence(text)) {
     review.issues.push({ type: 'עלילה', description: 'הפרק נקטע באמצע — חסר סיום במשפט שלם', severity: 'גבוה' });
   }
-  if (countWords(text) < 900) {
+  if (countWords(text) < MIN_CHAPTER_WORDS) {
     review.issues.push({ type: 'עלילה', description: `הפרק קצר מדי (${countWords(text)} מילים)`, severity: 'גבוה' });
   }
 
@@ -4547,13 +4597,30 @@ approved=true רק אם אין בעיות severity גבוה, יש סיום מל�
 async function fixChapter(text, review, idx, plan) {
   const book = state.book;
   const outline = book.chapterOutlines[idx];
+  const baselineWords = countWords(text);
+  const issues = review.issues || [];
+  const hasTruncationIssue = issues.some(i =>
+    i.severity === 'גבוה' && /נקטע|קצר מדי|סיום|חתוך/i.test(i.description || '')
+  );
+
+  if (hasTruncationIssue) {
+    const ctx = buildChapterContext(idx, plan);
+    const extended = await finalizeChapterEnding(text, idx, plan, ctx);
+    if (isChapterTextValid(extended) && countWords(extended) >= baselineWords * 0.85) {
+      return extended;
+    }
+  }
+
   const memoryContext = formatMemoryBookForPrompt();
-  const issuesList = (review.issues || [])
+  const issuesList = issues
     .map((i, n) => `${n + 1}. [${i.type}/${i.severity}] ${i.description}`)
     .join('\n');
+  const chapterBody = text.length > 14000
+    ? `${text.slice(0, 5000)}\n\n[...]\n\n${text.slice(-8000)}`
+    : text;
 
   const style = buildStyleInstructions(getBookProfile());
-  const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך מלא (לפחות 1200 מילים) ומעברי [***].
+  const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך מלא (לפחות ${MIN_CHAPTER_WORDS} מילים) ומעברי [***].
 ${style}
 אם הפרק נקטע — השלם אותו עד סיום מלא עם hook. סיים תמיד במשפט שלם.
 אל תשנה אירועים שלא קשורים לתיקון. החזר את הפרק המלא בלבד — ללא כותרת, ללא הסברים.
@@ -4567,11 +4634,24 @@ ${JSON.stringify(plan, null, 2)}
 ${memoryContext}
 
 **פרק לתיקון:**
-${text}`;
+${chapterBody}`;
 
-  const fixed = await callGemini(prompt, '', 8192);
+  let { text: fixed } = await callGeminiRaw(prompt, '', 12288);
+  fixed = (fixed || '').trim();
   if (!fixed || fixed.length < 200) return text;
-  return fixed.trim();
+
+  fixed = await extendProse(
+    fixed,
+    'השלם את הפרק עד סיום מלא במשפט שלם, עם hook לפרק הבא.',
+    MIN_CHAPTER_WORDS,
+    PROSE_EXTEND_MAX_ROUNDS,
+    6144
+  );
+
+  if (!isChapterTextValid(fixed) || countWords(fixed) < baselineWords * 0.75) {
+    return text;
+  }
+  return fixed;
 }
 
 async function updateMemoryBook(chapterText, chapterNum, outline) {
@@ -4666,6 +4746,18 @@ ${instruction}
   return { text: text.trim(), finishReason };
 }
 
+async function extendProse(text, instruction, minWords, maxRounds = PROSE_EXTEND_MAX_ROUNDS, maxTokens = 4096) {
+  let result = text.trim();
+  let finishReason = 'STOP';
+  for (let r = 0; r < maxRounds && isOutputTruncated(result, finishReason, minWords); r++) {
+    const cont = await continueProse(result, instruction, maxTokens);
+    if (!cont.text) break;
+    result = mergeContinuation(result, cont.text);
+    finishReason = cont.finishReason;
+  }
+  return result;
+}
+
 async function writeScene(idx, plan, sceneIndex, scene, priorInChapter, ctx, totalScenes) {
   const { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext } = ctx;
   const isFirst = sceneIndex === 0;
@@ -4705,34 +4797,36 @@ ${eventLogContext ? eventLogContext + '\n\n' : ''}${isFirst && lastChapterSnippe
 - אל תכתוב [***] — המעבר יתווסף אוטומטית
 - פרוזה בלבד, ללא כותרות`;
 
-  let { text, finishReason } = await callGeminiRaw(prompt, '', 8192);
+  let { text } = await callGeminiRaw(prompt, '', 8192);
   text = text.trim();
 
-  for (let c = 0; c < 2 && isOutputTruncated(text, finishReason, targetMin - 80); c++) {
-    const tailInstr = isLast
-      ? 'השלם את הסצנה האחרונה וסיים את הפרק ב-hook.'
-      : 'השלם את הסצנה עד סיום טבעי.';
-    const cont = await continueProse(text, tailInstr, 4096);
-    text = mergeContinuation(text, cont.text);
-    finishReason = cont.finishReason;
-  }
+  const tailInstr = isLast
+    ? 'השלם את הסצנה האחרונה וסיים את הפרק ב-hook.'
+    : 'השלם את הסצנה עד סיום טבעי.';
+  text = await extendProse(text, tailInstr, targetMin - 80, PROSE_EXTEND_MAX_ROUNDS, 4096);
 
   return text;
 }
 
 async function finalizeChapterEnding(fullText, idx, plan, ctx) {
-  if (endsWithCompleteSentence(fullText) && countWords(fullText) >= 1100) return fullText;
+  if (isChapterTextValid(fullText) && countWords(fullText) >= 1100) return fullText;
 
   const { outline } = ctx;
-  const cont = await continueProse(
+  let merged = await extendProse(
     fullText,
     `הפרק ${outline.number} ("${outline.title}") נקטע באמצע. כתוב את המשך וסיום הפרק בלבד — עוד 250-450 מילים, עם hook לפרק הבא.`,
+    MIN_CHAPTER_WORDS,
+    PROSE_EXTEND_MAX_ROUNDS,
     6144
   );
-  let merged = mergeContinuation(fullText, cont.text);
   if (!endsWithCompleteSentence(merged)) {
-    const cont2 = await continueProse(merged, 'סיים במשפט אחד חזק וסגור — סיום הפרק.', 2048);
-    merged = mergeContinuation(merged, cont2.text);
+    merged = await extendProse(
+      merged,
+      'סיים במשפט אחד חזק וסגור — סיום הפרק.',
+      MIN_CHAPTER_WORDS,
+      2,
+      4096
+    );
   }
   return merged;
 }
@@ -4758,11 +4852,7 @@ async function writeChapter(idx, plan, onSceneProgress) {
 
   let full = parts.join('\n\n').trim();
   full = await finalizeChapterEnding(full, idx, plan, ctx);
-
-  const words = countWords(full);
-  if (words < 900) throw new Error(`הפרק קצר מדי (${words} מילים) — נסה שוב`);
-  if (!endsWithCompleteSentence(full)) throw new Error('הפרק נסגר ללא סיום מלא — נסה שוב');
-
+  assertChapterTextValid(full);
   return full;
 }
 
