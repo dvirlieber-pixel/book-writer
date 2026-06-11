@@ -57,6 +57,23 @@ function reportStorageError(e) {
   }
 }
 
+function reportLoadError(e) {
+  console.error('load failed', e);
+  let msg = 'שגיאה בטעינת הנתונים מהמכשיר.';
+  if (e?.name === 'SyntaxError') {
+    msg += ' הנתונים השמורים פגומים — אם יש לך גיבוי JSON, ייבא אותו דרך «גיבוי המדף».';
+  } else if (e?.message) {
+    msg += ' ' + e.message;
+  }
+  showError('welcome-error', msg);
+  showError('library-error', msg);
+}
+
+function ensureMinimalAppShell() {
+  if (!app.books) app.books = {};
+  if (!app.readingPrefs) app.readingPrefs = { fontScale: 1, theme: 'dark', immersive: false };
+}
+
 async function flushSave() {
   syncAppFromState();
   try {
@@ -134,8 +151,8 @@ function applyLoadedAppData() {
 }
 
 async function loadApp() {
+  let loaded = false;
   try {
-    let loaded = false;
     if ('indexedDB' in window) {
       try {
         const fromIdb = await idbReadApp();
@@ -168,7 +185,19 @@ async function loadApp() {
     if (loaded) applyLoadedAppData();
     else state = createEmptyBookState();
   } catch (e) {
-    console.error('load failed', e);
-    state = createEmptyBookState();
+    const preservedKey = app?.apiKey || state?.apiKey || '';
+    ensureMinimalAppShell();
+    if (loaded) {
+      state = createEmptyBookState();
+      state.apiKey = preservedKey;
+      if (app.currentBookId && app.books[app.currentBookId]) {
+        try { applyBookSnapshot(app.books[app.currentBookId]); } catch (_) {}
+      }
+    } else {
+      app.apiKey = preservedKey;
+      state = createEmptyBookState();
+      state.apiKey = preservedKey;
+    }
+    reportLoadError(e);
   }
 }
