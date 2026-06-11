@@ -41,6 +41,10 @@ function exportFunctions(s) {
 function namespaceIdentifiers(s, names, prefix) {
   let out = s;
   for (const name of [...names].sort((a, b) => b.length - a.length)) {
+    out = out.replace(
+      new RegExp(`\\.\\.\\.\\s*\\b${name}\\b`, 'g'),
+      `...${prefix}.${name}`
+    );
     const re = new RegExp(`(?<![.${prefix}])\\b${name}\\b`, 'g');
     out = out.replace(re, `${prefix}.${name}`);
   }

@@ -45,6 +45,11 @@ function exportFunctions(s) {
 function ns(s, names, prefix) {
   let out = s;
   for (const name of [...names].sort((a, b) => b.length - a.length)) {
+    // Spread: ...welcomeDraft → ...store.welcomeDraft (lookbehind skips dotted forms)
+    out = out.replace(
+      new RegExp(`\\.\\.\\.\\s*\\b${name}\\b`, 'g'),
+      `...${prefix}.${name}`
+    );
     // Skip object literal keys (e.g. readingLengthKey: 'short')
     out = out.replace(
       new RegExp(`(?<![.${prefix}])\\b${name}\\b(?!\\s*:)`, 'g'),

@@ -985,7 +985,7 @@ function onImportLibraryFile(ev) {
           updateApiKeyStatus();
         }
       }
-      if (data.readingPrefs) store.app.readingPrefs = { ...app.readingPrefs, ...data.readingPrefs };
+      if (data.readingPrefs) store.app.readingPrefs = { ...store.app.readingPrefs, ...data.readingPrefs };
       if (data.tasteProfiles?.length) store.app.tasteProfiles = data.tasteProfiles;
       migrateBooksInApp();
       const ids = Object.keys(store.app.books);
