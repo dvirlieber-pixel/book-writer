@@ -1,11 +1,27 @@
-const CACHE_NAME = 'seferiyat-hanetzach-v9';
+const CACHE_NAME = 'seferiyat-hanetzach-v10';
 
 const PRECACHE_URLS = [
   './',
   './index.html',
+  './styles.css',
   './manifest.webmanifest',
   './DLSplash.jsx',
   './DLWatermark.jsx',
+  './js/config.js',
+  './js/book.js',
+  './js/globals.js',
+  './js/storage.js',
+  './js/prefs-export.js',
+  './js/shelf.js',
+  './js/creation-resume.js',
+  './js/screens.js',
+  './js/api.js',
+  './js/book-create.js',
+  './js/chapters.js',
+  './js/library.js',
+  './js/reading.js',
+  './js/utils.js',
+  './js/init.js',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
