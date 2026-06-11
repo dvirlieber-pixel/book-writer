@@ -5,6 +5,12 @@ export const IDB_NAME = 'seferiyat-hanetzach';
 export const IDB_VERSION = 1;
 export const IDB_STORE = 'kv';
 export const GEMINI_FETCH_TIMEOUT_MS = 120000;
+/** מרווח מינימלי בין בקשות — שומר מתחת למכסת RPM החינמית */
+export const GEMINI_MIN_REQUEST_GAP_MS = 2800;
+/** מקסימום בקשות בדקה (חלון גלישה) */
+export const GEMINI_MAX_REQUESTS_PER_MINUTE = 12;
+/** השהיה אחרי 429 מקומי (RPM) לפני ניסיון חוזר */
+export const GEMINI_RATE_LIMIT_PAUSE_MS = 45000;
 export const SAVE_DEBOUNCE_MS = 150;
 export const IMPORT_MAX_BYTES = 50 * 1024 * 1024;
 export const EXPORT_FORMAT_VERSION = 3;

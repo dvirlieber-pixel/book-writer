@@ -1358,6 +1358,7 @@ if (ltEl) ltEl.textContent =
 
   const statusInterval = startLoadingStatusRotation();
   store.bookCreationInFlight = true;
+  setGeminiCallPriority('high');
   try {
     let bookData;
     if (pending.kind === 'sequel' && pending.parentBookId) {
@@ -1409,6 +1410,7 @@ if (ltEl) ltEl.textContent =
     }
     return true;
   } finally {
+    popGeminiCallPriority();
     store.bookCreationInFlight = false;
   }
 }
@@ -1426,6 +1428,7 @@ if (ltEl) ltEl.textContent =
     pending.kind === 'sequel' ? 'ממשיך לפתוח המשך...' : 'ממשיך ליצור את הספר...';
 
   store.bookCreationInFlight = true;
+  setGeminiCallPriority('high');
   try {
     renderLibrary();
     await finishNewBookChapterZero(pending);
@@ -1449,6 +1452,7 @@ if (ltEl) ltEl.textContent =
     }
     return true;
   } finally {
+    popGeminiCallPriority();
     store.bookCreationInFlight = false;
   }
 }
@@ -1750,6 +1754,122 @@ function applyWelcomeDefaults() {
 
 // --- api.js ---
 // ===== API CALL =====
+
+const geminiRateLimiter = {
+  queue: [],
+  pumping: false,
+  lastRequestAt: 0,
+  pausedUntil: 0,
+  recentTimestamps: []
+};
+
+const geminiPriorityStack = ['normal'];
+
+function setGeminiCallPriority(priority) {
+  geminiPriorityStack.push(priority);
+}
+
+function popGeminiCallPriority() {
+  if (geminiPriorityStack.length > 1) geminiPriorityStack.pop();
+}
+
+function resolveGeminiPriority(options = {}) {
+  return options.priority || geminiPriorityStack[geminiPriorityStack.length - 1] || 'normal';
+}
+
+function isDailyQuotaError(message) {
+  const m = (message || '').toLowerCase();
+  return /per day|daily limit|quota.*day|requests per day|\brpd\b|per 24/.test(m);
+}
+
+function pruneGeminiRequestWindow(now = Date.now()) {
+  geminiRateLimiter.recentTimestamps = geminiRateLimiter.recentTimestamps.filter(t => now - t < 60000);
+}
+
+function scheduleGeminiPause(ms) {
+  const pause = Math.max(ms, 5000);
+  geminiRateLimiter.pausedUntil = Math.max(geminiRateLimiter.pausedUntil, Date.now() + pause);
+  return pause;
+}
+
+function showGeminiRateLimitStatus(waitMs) {
+  const sec = Math.ceil(waitMs / 1000);
+  const msg = sec > 8
+    ? `ממתין ${sec} שניות — מגבלת קצב של Gemini (האפליקציה ממשיכה אוטומטית)...`
+    : 'ממתין רגע לפני הבקשה הבאה...';
+  const el = document.getElementById('loading-status')
+    || document.getElementById('writing-status-text');
+  if (el) el.textContent = msg;
+}
+
+async function waitForGeminiSlot() {
+  const delay = ms => new Promise(res => setTimeout(res, ms));
+  while (true) {
+    const now = Date.now();
+    if (now < geminiRateLimiter.pausedUntil) {
+      const waitMs = geminiRateLimiter.pausedUntil - now;
+      showGeminiRateLimitStatus(waitMs);
+      await delay(Math.min(waitMs, 5000));
+      continue;
+    }
+    pruneGeminiRequestWindow(now);
+    if (geminiRateLimiter.recentTimestamps.length >= cfg.GEMINI_MAX_REQUESTS_PER_MINUTE) {
+      const oldest = geminiRateLimiter.recentTimestamps[0];
+      const waitMs = 60000 - (now - oldest) + 250;
+      showGeminiRateLimitStatus(waitMs);
+      await delay(Math.min(waitMs, 5000));
+      continue;
+    }
+    const gap = cfg.GEMINI_MIN_REQUEST_GAP_MS - (now - geminiRateLimiter.lastRequestAt);
+    if (gap > 0) await delay(gap);
+    return;
+  }
+}
+
+function recordGeminiRequest() {
+  const now = Date.now();
+  geminiRateLimiter.lastRequestAt = now;
+  geminiRateLimiter.recentTimestamps.push(now);
+  pruneGeminiRequestWindow(now);
+}
+
+function enqueueGeminiRequest(fn, priority = 'normal') {
+  return new Promise((resolve, reject) => {
+    const job = { fn, resolve, reject, priority };
+    if (priority === 'high') {
+      const idx = geminiRateLimiter.queue.findIndex(j => j.priority !== 'high');
+      geminiRateLimiter.queue.splice(idx === -1 ? geminiRateLimiter.queue.length : idx, 0, job);
+    } else if (priority === 'low') {
+      geminiRateLimiter.queue.push(job);
+    } else {
+      const idx = geminiRateLimiter.queue.findIndex(j => j.priority === 'low');
+      geminiRateLimiter.queue.splice(idx === -1 ? geminiRateLimiter.queue.length : idx, 0, job);
+    }
+    pumpGeminiRequestQueue();
+  });
+}
+
+async function pumpGeminiRequestQueue() {
+  if (geminiRateLimiter.pumping) return;
+  geminiRateLimiter.pumping = true;
+  try {
+    while (geminiRateLimiter.queue.length) {
+      const job = geminiRateLimiter.queue.shift();
+      try {
+        await waitForGeminiSlot();
+        const result = await job.fn();
+        recordGeminiRequest();
+        job.resolve(result);
+      } catch (e) {
+        job.reject(e);
+      }
+    }
+  } finally {
+    geminiRateLimiter.pumping = false;
+    if (geminiRateLimiter.queue.length) pumpGeminiRequestQueue();
+  }
+}
+
 function isQuotaApiError(status, message) {
   if (status === 429) return true;
   const m = (message || '').toLowerCase();
@@ -1811,6 +1931,14 @@ function refreshModelFallbackNotice() {
 }
 
 async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE, options = {}) {
+  const priority = resolveGeminiPriority(options);
+  return enqueueGeminiRequest(
+    () => executeGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model, options),
+    priority
+  );
+}
+
+async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE, options = {}) {
   const delay = ms => new Promise(res => setTimeout(res, ms));
   const generationConfig = {
     maxOutputTokens: maxTokens,
@@ -1844,7 +1972,19 @@ async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries
 
       if (response.status === 429) {
         const errBody = await response.json().catch(() => ({}));
-        throw quotaExceededError(errBody?.error?.message);
+        const msg = errBody?.error?.message || '';
+        if (isDailyQuotaError(msg)) throw quotaExceededError(msg);
+        const retryHdr = parseInt(response.headers.get('Retry-After'), 10);
+        const backoffMs = scheduleGeminiPause(
+          (retryHdr && !Number.isNaN(retryHdr) ? retryHdr * 1000 : null)
+          || cfg.GEMINI_RATE_LIMIT_PAUSE_MS * (attempt + 1)
+        );
+        if (attempt < retries) {
+          showGeminiRateLimitStatus(backoffMs);
+          await delay(backoffMs);
+          continue;
+        }
+        throw quotaExceededError(msg || 'יותר מדי בקשות בדקה — נסה שוב בעוד דקה');
       }
 
       if (response.status === 503) {
@@ -1857,7 +1997,7 @@ async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         const msg = err?.error?.message || `שגיאת API: ${response.status}`;
-        if (isQuotaApiError(response.status, msg)) throw quotaExceededError(msg);
+        if (isQuotaApiError(response.status, msg) && isDailyQuotaError(msg)) throw quotaExceededError(msg);
         if (response.status === 404 || isModelNotFoundError(null, response.status)) {
           const e = new Error(msg);
           e.status = 404;
@@ -1881,7 +2021,7 @@ async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries
       }
       if (e.modelNotFound || isModelNotFoundError(e, e.status)) throw e;
       if (e.message && e.message.includes('הגעת למכסה החינמית')) throw e;
-      if (isQuotaApiError(null, e.message)) throw quotaExceededError(e.message);
+      if (isQuotaApiError(null, e.message) && isDailyQuotaError(e.message)) throw quotaExceededError(e.message);
       if (attempt < retries && (e.message.includes('503') || e.message.includes('fetch'))) {
         const waitSec = (attempt + 1) * 8;
         await delay(waitSec * 1000);
@@ -2022,6 +2162,7 @@ async function startBookCreation() {
 
   const statusInterval = startLoadingStatusRotation();
   store.bookCreationInFlight = true;
+  setGeminiCallPriority('high');
 
   try {
     const bookData = normalizeBlueprint(await createBookBlueprint());
@@ -2046,6 +2187,7 @@ async function startBookCreation() {
     showScreen('welcome-screen');
     showError('welcome-error', 'שגיאה ביצירת הספר: ' + e.message);
   } finally {
+    popGeminiCallPriority();
     store.bookCreationInFlight = false;
   }
 }
@@ -2252,6 +2394,7 @@ async function startSequelBook(sourceId, lengthKey) {
   document.getElementById('loading-title').textContent = 'פותח המשך בעולם הזה...';
   document.getElementById('loading-status').textContent = 'בונה על הסיפור הקודם...';
   store.bookCreationInFlight = true;
+  setGeminiCallPriority('high');
 
   try {
     const bookData = normalizeBlueprint(await createSequelBlueprint(parent));
@@ -2278,6 +2421,7 @@ async function startSequelBook(sourceId, lengthKey) {
     showScreen('library-screen');
     showError('library-error', 'שגיאה ביצירת ספר המשך: ' + e.message);
   } finally {
+    popGeminiCallPriority();
     store.bookCreationInFlight = false;
   }
 }
@@ -2348,6 +2492,7 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   }
 
   ensureMemoryBook();
+  setGeminiCallPriority(background ? 'low' : 'high');
   store.state.writing = true;
   store.state.generatingIdx = idx;
   const chapterNum = idx + 1;
@@ -2430,8 +2575,10 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
 
     notifyReadingChapterPipeline(idx, false);
     updatePrepareNextButton();
+    popGeminiCallPriority();
 
   } catch(e) {
+    popGeminiCallPriority();
     store.state.writing = false;
     store.state.generatingIdx = null;
     save();
@@ -3443,6 +3590,17 @@ export {
   showScreen,
   showLibrary,
   applyWelcomeDefaults,
+  setGeminiCallPriority,
+  popGeminiCallPriority,
+  resolveGeminiPriority,
+  isDailyQuotaError,
+  pruneGeminiRequestWindow,
+  scheduleGeminiPause,
+  showGeminiRateLimitStatus,
+  waitForGeminiSlot,
+  recordGeminiRequest,
+  enqueueGeminiRequest,
+  pumpGeminiRequestQueue,
   isQuotaApiError,
   quotaExceededError,
   normalizeApiError,
@@ -3451,6 +3609,7 @@ export {
   clearModelFallbackIfPrimary,
   refreshModelFallbackNotice,
   callGeminiRawOnce,
+  executeGeminiRawOnce,
   callGeminiRawWithModelChain,
   callGeminiRaw,
   callGemini,

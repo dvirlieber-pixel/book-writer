@@ -1,5 +1,121 @@
 // Gemini API client
 // ===== API CALL =====
+
+const geminiRateLimiter = {
+  queue: [],
+  pumping: false,
+  lastRequestAt: 0,
+  pausedUntil: 0,
+  recentTimestamps: []
+};
+
+const geminiPriorityStack = ['normal'];
+
+function setGeminiCallPriority(priority) {
+  geminiPriorityStack.push(priority);
+}
+
+function popGeminiCallPriority() {
+  if (geminiPriorityStack.length > 1) geminiPriorityStack.pop();
+}
+
+function resolveGeminiPriority(options = {}) {
+  return options.priority || geminiPriorityStack[geminiPriorityStack.length - 1] || 'normal';
+}
+
+function isDailyQuotaError(message) {
+  const m = (message || '').toLowerCase();
+  return /per day|daily limit|quota.*day|requests per day|\brpd\b|per 24/.test(m);
+}
+
+function pruneGeminiRequestWindow(now = Date.now()) {
+  geminiRateLimiter.recentTimestamps = geminiRateLimiter.recentTimestamps.filter(t => now - t < 60000);
+}
+
+function scheduleGeminiPause(ms) {
+  const pause = Math.max(ms, 5000);
+  geminiRateLimiter.pausedUntil = Math.max(geminiRateLimiter.pausedUntil, Date.now() + pause);
+  return pause;
+}
+
+function showGeminiRateLimitStatus(waitMs) {
+  const sec = Math.ceil(waitMs / 1000);
+  const msg = sec > 8
+    ? `ממתין ${sec} שניות — מגבלת קצב של Gemini (האפליקציה ממשיכה אוטומטית)...`
+    : 'ממתין רגע לפני הבקשה הבאה...';
+  const el = document.getElementById('loading-status')
+    || document.getElementById('writing-status-text');
+  if (el) el.textContent = msg;
+}
+
+async function waitForGeminiSlot() {
+  const delay = ms => new Promise(res => setTimeout(res, ms));
+  while (true) {
+    const now = Date.now();
+    if (now < geminiRateLimiter.pausedUntil) {
+      const waitMs = geminiRateLimiter.pausedUntil - now;
+      showGeminiRateLimitStatus(waitMs);
+      await delay(Math.min(waitMs, 5000));
+      continue;
+    }
+    pruneGeminiRequestWindow(now);
+    if (geminiRateLimiter.recentTimestamps.length >= GEMINI_MAX_REQUESTS_PER_MINUTE) {
+      const oldest = geminiRateLimiter.recentTimestamps[0];
+      const waitMs = 60000 - (now - oldest) + 250;
+      showGeminiRateLimitStatus(waitMs);
+      await delay(Math.min(waitMs, 5000));
+      continue;
+    }
+    const gap = GEMINI_MIN_REQUEST_GAP_MS - (now - geminiRateLimiter.lastRequestAt);
+    if (gap > 0) await delay(gap);
+    return;
+  }
+}
+
+function recordGeminiRequest() {
+  const now = Date.now();
+  geminiRateLimiter.lastRequestAt = now;
+  geminiRateLimiter.recentTimestamps.push(now);
+  pruneGeminiRequestWindow(now);
+}
+
+function enqueueGeminiRequest(fn, priority = 'normal') {
+  return new Promise((resolve, reject) => {
+    const job = { fn, resolve, reject, priority };
+    if (priority === 'high') {
+      const idx = geminiRateLimiter.queue.findIndex(j => j.priority !== 'high');
+      geminiRateLimiter.queue.splice(idx === -1 ? geminiRateLimiter.queue.length : idx, 0, job);
+    } else if (priority === 'low') {
+      geminiRateLimiter.queue.push(job);
+    } else {
+      const idx = geminiRateLimiter.queue.findIndex(j => j.priority === 'low');
+      geminiRateLimiter.queue.splice(idx === -1 ? geminiRateLimiter.queue.length : idx, 0, job);
+    }
+    pumpGeminiRequestQueue();
+  });
+}
+
+async function pumpGeminiRequestQueue() {
+  if (geminiRateLimiter.pumping) return;
+  geminiRateLimiter.pumping = true;
+  try {
+    while (geminiRateLimiter.queue.length) {
+      const job = geminiRateLimiter.queue.shift();
+      try {
+        await waitForGeminiSlot();
+        const result = await job.fn();
+        recordGeminiRequest();
+        job.resolve(result);
+      } catch (e) {
+        job.reject(e);
+      }
+    }
+  } finally {
+    geminiRateLimiter.pumping = false;
+    if (geminiRateLimiter.queue.length) pumpGeminiRequestQueue();
+  }
+}
+
 function isQuotaApiError(status, message) {
   if (status === 429) return true;
   const m = (message || '').toLowerCase();
@@ -61,6 +177,14 @@ function refreshModelFallbackNotice() {
 }
 
 async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE, options = {}) {
+  const priority = resolveGeminiPriority(options);
+  return enqueueGeminiRequest(
+    () => executeGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model, options),
+    priority
+  );
+}
+
+async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE, options = {}) {
   const delay = ms => new Promise(res => setTimeout(res, ms));
   const generationConfig = {
     maxOutputTokens: maxTokens,
@@ -94,7 +218,19 @@ async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries
 
       if (response.status === 429) {
         const errBody = await response.json().catch(() => ({}));
-        throw quotaExceededError(errBody?.error?.message);
+        const msg = errBody?.error?.message || '';
+        if (isDailyQuotaError(msg)) throw quotaExceededError(msg);
+        const retryHdr = parseInt(response.headers.get('Retry-After'), 10);
+        const backoffMs = scheduleGeminiPause(
+          (retryHdr && !Number.isNaN(retryHdr) ? retryHdr * 1000 : null)
+          || GEMINI_RATE_LIMIT_PAUSE_MS * (attempt + 1)
+        );
+        if (attempt < retries) {
+          showGeminiRateLimitStatus(backoffMs);
+          await delay(backoffMs);
+          continue;
+        }
+        throw quotaExceededError(msg || 'יותר מדי בקשות בדקה — נסה שוב בעוד דקה');
       }
 
       if (response.status === 503) {
@@ -107,7 +243,7 @@ async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         const msg = err?.error?.message || `שגיאת API: ${response.status}`;
-        if (isQuotaApiError(response.status, msg)) throw quotaExceededError(msg);
+        if (isQuotaApiError(response.status, msg) && isDailyQuotaError(msg)) throw quotaExceededError(msg);
         if (response.status === 404 || isModelNotFoundError(null, response.status)) {
           const e = new Error(msg);
           e.status = 404;
@@ -131,7 +267,7 @@ async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries
       }
       if (e.modelNotFound || isModelNotFoundError(e, e.status)) throw e;
       if (e.message && e.message.includes('הגעת למכסה החינמית')) throw e;
-      if (isQuotaApiError(null, e.message)) throw quotaExceededError(e.message);
+      if (isQuotaApiError(null, e.message) && isDailyQuotaError(e.message)) throw quotaExceededError(e.message);
       if (attempt < retries && (e.message.includes('503') || e.message.includes('fetch'))) {
         const waitSec = (attempt + 1) * 8;
         await delay(waitSec * 1000);

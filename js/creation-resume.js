@@ -159,6 +159,7 @@ if (ltEl) ltEl.textContent =
 
   const statusInterval = startLoadingStatusRotation();
   bookCreationInFlight = true;
+  setGeminiCallPriority('high');
   try {
     let bookData;
     if (pending.kind === 'sequel' && pending.parentBookId) {
@@ -210,6 +211,7 @@ if (ltEl) ltEl.textContent =
     }
     return true;
   } finally {
+    popGeminiCallPriority();
     bookCreationInFlight = false;
   }
 }
@@ -227,6 +229,7 @@ if (ltEl) ltEl.textContent =
     pending.kind === 'sequel' ? 'ממשיך לפתוח המשך...' : 'ממשיך ליצור את הספר...';
 
   bookCreationInFlight = true;
+  setGeminiCallPriority('high');
   try {
     renderLibrary();
     await finishNewBookChapterZero(pending);
@@ -250,6 +253,7 @@ if (ltEl) ltEl.textContent =
     }
     return true;
   } finally {
+    popGeminiCallPriority();
     bookCreationInFlight = false;
   }
 }

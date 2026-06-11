@@ -28,6 +28,7 @@ async function startBookCreation() {
 
   const statusInterval = startLoadingStatusRotation();
   bookCreationInFlight = true;
+  setGeminiCallPriority('high');
 
   try {
     const bookData = normalizeBlueprint(await createBookBlueprint());
@@ -52,6 +53,7 @@ async function startBookCreation() {
     showScreen('welcome-screen');
     showError('welcome-error', 'שגיאה ביצירת הספר: ' + e.message);
   } finally {
+    popGeminiCallPriority();
     bookCreationInFlight = false;
   }
 }
@@ -258,6 +260,7 @@ async function startSequelBook(sourceId, lengthKey) {
   document.getElementById('loading-title').textContent = 'פותח המשך בעולם הזה...';
   document.getElementById('loading-status').textContent = 'בונה על הסיפור הקודם...';
   bookCreationInFlight = true;
+  setGeminiCallPriority('high');
 
   try {
     const bookData = normalizeBlueprint(await createSequelBlueprint(parent));
@@ -284,6 +287,7 @@ async function startSequelBook(sourceId, lengthKey) {
     showScreen('library-screen');
     showError('library-error', 'שגיאה ביצירת ספר המשך: ' + e.message);
   } finally {
+    popGeminiCallPriority();
     bookCreationInFlight = false;
   }
 }

@@ -63,6 +63,7 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   }
 
   ensureMemoryBook();
+  setGeminiCallPriority(background ? 'low' : 'high');
   state.writing = true;
   state.generatingIdx = idx;
   const chapterNum = idx + 1;
@@ -145,8 +146,10 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
 
     notifyReadingChapterPipeline(idx, false);
     updatePrepareNextButton();
+    popGeminiCallPriority();
 
   } catch(e) {
+    popGeminiCallPriority();
     state.writing = false;
     state.generatingIdx = null;
     save();
