@@ -2131,6 +2131,24 @@ function sanitizeBookTitle(title) {
   return looksLikeMetaOrErrorTitle(t) ? 'ספר חדש' : t;
 }
 
+function sanitizeStoredBook(snap) {
+  if (!snap) return snap;
+  const out = { ...snap };
+  if (out.book) out.book = normalizeBlueprint(out.book);
+  if (out.chapters?.length) {
+    out.chapters = out.chapters.map((ch, i) => {
+      const num = ch.number || i + 1;
+      const fromOutline = out.book?.chapterOutlines?.[i]?.title;
+      return {
+        ...ch,
+        number: num,
+        title: sanitizeChapterTitle(fromOutline || ch.title, num)
+      };
+    });
+  }
+  return out;
+}
+
 function normalizeBlueprint(book) {
   if (!book) return book;
   const out = { ...book };
@@ -2279,13 +2297,7 @@ function migrateBooksInApp() {
       b.readingLengthKey = t >= 45 ? 'long' : t >= 25 ? 'medium' : 'short';
     }
     if (b.memoryBook) b.memoryBook = migrateMemoryBook(b.memoryBook);
-    if (b.book) b.book = normalizeBlueprint(b.book);
-    if (b.chapters?.length) {
-      b.chapters = b.chapters.map((ch, i) => ({
-        ...ch,
-        title: sanitizeChapterTitle(ch.title, ch.number || i + 1)
-      }));
-    }
+    Object.assign(b, sanitizeStoredBook(b));
   });
 }
 
@@ -2320,7 +2332,7 @@ function newBookId() {
 }
 
 function bookSnapshot() {
-  return {
+  const snap = sanitizeStoredBook({
     id: state.id,
     bookProfile: state.bookProfile || defaultBookProfile(),
     readingLengthKey: state.readingLengthKey || 'short',
@@ -2338,7 +2350,8 @@ function bookSnapshot() {
     rating: state.rating || 0,
     expandChapterList: !!state.expandChapterList,
     lastReadScroll: state.lastReadScroll || 0
-  };
+  });
+  return snap;
 }
 
 function deepClone(obj) {
@@ -2578,13 +2591,9 @@ function applyBookSnapshot(snap) {
   } else if (!state.totalChapters) {
     state.totalChapters = LENGTH_PRESETS.short.chapters;
   }
-  if (state.book) state.book = normalizeBlueprint(state.book);
-  if (state.chapters?.length) {
-    state.chapters = state.chapters.map((ch, i) => ({
-      ...ch,
-      title: sanitizeChapterTitle(ch.title, ch.number || i + 1)
-    }));
-  }
+  const clean = sanitizeStoredBook({ book: state.book, chapters: state.chapters });
+  if (clean.book) state.book = clean.book;
+  if (clean.chapters) state.chapters = clean.chapters;
   ensureMemoryBook();
 }
 
@@ -2621,6 +2630,7 @@ function load() {
           };
           app.currentBookId = id;
         }
+        migrateBooksInApp();
         save();
       }
     } else {
@@ -4636,7 +4646,7 @@ ${memoryContext}
 **פרק לתיקון:**
 ${chapterBody}`;
 
-  let { text: fixed } = await callGeminiRaw(prompt, '', 12288);
+  let { text: fixed, finishReason } = await callGeminiRaw(prompt, '', 12288);
   fixed = (fixed || '').trim();
   if (!fixed || fixed.length < 200) return text;
 
@@ -4645,7 +4655,8 @@ ${chapterBody}`;
     'השלם את הפרק עד סיום מלא במשפט שלם, עם hook לפרק הבא.',
     MIN_CHAPTER_WORDS,
     PROSE_EXTEND_MAX_ROUNDS,
-    6144
+    6144,
+    finishReason
   );
 
   if (!isChapterTextValid(fixed) || countWords(fixed) < baselineWords * 0.75) {
@@ -4746,9 +4757,9 @@ ${instruction}
   return { text: text.trim(), finishReason };
 }
 
-async function extendProse(text, instruction, minWords, maxRounds = PROSE_EXTEND_MAX_ROUNDS, maxTokens = 4096) {
+async function extendProse(text, instruction, minWords, maxRounds = PROSE_EXTEND_MAX_ROUNDS, maxTokens = 4096, initialFinishReason = 'STOP') {
   let result = text.trim();
-  let finishReason = 'STOP';
+  let finishReason = initialFinishReason || 'STOP';
   for (let r = 0; r < maxRounds && isOutputTruncated(result, finishReason, minWords); r++) {
     const cont = await continueProse(result, instruction, maxTokens);
     if (!cont.text) break;
@@ -4797,13 +4808,13 @@ ${eventLogContext ? eventLogContext + '\n\n' : ''}${isFirst && lastChapterSnippe
 - אל תכתוב [***] — המעבר יתווסף אוטומטית
 - פרוזה בלבד, ללא כותרות`;
 
-  let { text } = await callGeminiRaw(prompt, '', 8192);
+  let { text, finishReason } = await callGeminiRaw(prompt, '', 8192);
   text = text.trim();
 
   const tailInstr = isLast
     ? 'השלם את הסצנה האחרונה וסיים את הפרק ב-hook.'
     : 'השלם את הסצנה עד סיום טבעי.';
-  text = await extendProse(text, tailInstr, targetMin - 80, PROSE_EXTEND_MAX_ROUNDS, 4096);
+  text = await extendProse(text, tailInstr, targetMin - 80, PROSE_EXTEND_MAX_ROUNDS, 4096, finishReason);
 
   return text;
 }
@@ -5087,7 +5098,8 @@ function openChapter(idx) {
 
   document.getElementById('reading-chapter-label').textContent = `פרק ${chapter.number} מתוך ${state.totalChapters}`;
   document.getElementById('reading-chapter-num').textContent = `פרק ${chapter.number}`;
-  document.getElementById('reading-chapter-title').textContent = chapter.title;
+  document.getElementById('reading-chapter-title').textContent =
+    sanitizeChapterTitle(chapter.title, chapter.number || idx + 1);
 
   // Epigraph from book outline
   const outline = state.book?.chapterOutlines?.[idx];
