@@ -3761,9 +3761,13 @@ function endsWithCompleteSentence(text) {
 }
 
 function isOutputTruncated(text, finishReason, minWords) {
-  if (finishReason === 'MAX_TOKENS') return true;
+  if (finishReason === 'MAX_TOKENS' || finishReason === 'LENGTH') return true;
   if (countWords(text) < minWords) return true;
-  return !endsWithCompleteSentence(text);
+  if (!endsWithCompleteSentence(text)) return true;
+  // בדיקה נוספת: אם הטקסט נגמר באמצע דיאלוג פתוח
+  const trimmed = text.trimEnd();
+  if (trimmed.endsWith('"') === false && (trimmed.match(/"/g) || []).length % 2 !== 0) return true;
+  return false;
 }
 
 function mergeContinuation(existing, continuation) {
@@ -4620,7 +4624,13 @@ async function writeScene(idx, plan, sceneIndex, scene, priorInChapter, ctx, tot
     : '';
 
   const style = buildStyleInstructions(getBookProfile());
-  const prompt = `${style}
+  const wordTarget = `⚠️ הנחיית אורך קריטית: כתוב בדיוק ${targetMin}–${targetMax} מילים לסצנה זו. ` +
+  `כשאתה מתקרב ל-${targetMax} מילים — סיים את הסצנה באופן טבעי במשפט שלם. ` +
+  `אל תיקטע באמצע משפט או דיאלוג.`;
+
+const prompt = `${wordTarget}
+
+${style}
 
 **ספר:** ${book.title} | **פרק ${outline.number}:** ${outline.title} | **POV:** ${outline.pov}
 
