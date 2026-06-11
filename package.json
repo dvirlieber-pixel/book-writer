@@ -1,0 +1,18 @@
+{
+  "name": "seferiyat-hanetzach",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/build-app-bundle.mjs && vite build",
+    "bundle": "node scripts/build-app-bundle.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}
