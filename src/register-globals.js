@@ -1,4 +1,0 @@
-export function registerGlobals(App) {
-  const pick = (names) => Object.fromEntries(names.map(n => [n, App[n]]).filter(([, v]) => typeof v === 'function'));
-  Object.assign(window, pick(["applyAppUpdate","dismissUpdateBanner","promptPwaInstall","dismissInstallBanner","selectChoice","selectReadingLength","toggleApiKeyVisibility","startBookCreation","startRandomBook","showShelf","toggleTheme","openWelcomeApiSettings","openWelcomeNewBook","exportLibraryJson","onImportLibraryFile","onShelfFilterChange","onShelfSortChange","selectSequelLength","confirmSequelBook","cancelSequelSetup","cancelPendingBookCreation","readNextChapter","prepareNextChapter","showLibrary","adjustFontSize","toggleReadingLandscape","toggleReadingImmersive","toggleWakeLock","closeChapterDrawer","onApiKeyInput","saveApiKeyFromInput","setBookRating","deleteBookFromShelf"]));
-}

@@ -454,7 +454,7 @@ function renderBookCompletePanel() {
   panel.className = 'book-complete-actions';
   const seriesNote = state.sequelIndex > 1 ? ` · ספר ${state.sequelIndex} בסדרה` : '';
   const stars = [1, 2, 3, 4, 5].map(n =>
-    `<button type="button" class="rating-star ${(state.rating || 0) >= n ? 'on' : ''}" onclick="setBookRating(${n})" title="${n} כוכבים">★</button>`
+    `<button type="button" class="rating-star ${(state.rating || 0) >= n ? 'on' : ''}" data-action="setBookRating" data-rating="${n}" title="${n} כוכבים">★</button>`
   ).join('');
 
   panel.innerHTML = `

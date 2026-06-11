@@ -1,7 +1,7 @@
 import '../styles.css';
 import * as App from './app.js';
-import { registerGlobals } from './register-globals.js';
+import { bindEvents } from './bind-events.js';
 import { boot } from './boot.js';
 
-registerGlobals(App);
+bindEvents(App);
 boot(App);

@@ -137,30 +137,11 @@ fs.writeFileSync(path.join(root, 'src', 'app.js'), appJs);
 // main.js
 fs.writeFileSync(path.join(root, 'src', 'main.js'), `import '../styles.css';
 import * as App from './app.js';
-import { registerGlobals } from './register-globals.js';
+import { bindEvents } from './bind-events.js';
 import { boot } from './boot.js';
 
-registerGlobals(App);
+bindEvents(App);
 boot(App);
-`);
-
-// register-globals.js
-const handlers = [
-  'applyAppUpdate', 'dismissUpdateBanner', 'promptPwaInstall', 'dismissInstallBanner',
-  'selectChoice', 'selectReadingLength', 'toggleApiKeyVisibility', 'startBookCreation',
-  'startRandomBook', 'showShelf', 'toggleTheme', 'openWelcomeApiSettings', 'openWelcomeNewBook',
-  'exportLibraryJson', 'onImportLibraryFile', 'onShelfFilterChange', 'onShelfSortChange',
-  'selectSequelLength', 'confirmSequelBook', 'cancelSequelSetup', 'cancelPendingBookCreation',
-  'readNextChapter', 'prepareNextChapter', 'showLibrary', 'adjustFontSize',
-  'toggleReadingLandscape', 'toggleReadingImmersive', 'toggleWakeLock', 'closeChapterDrawer',
-  'onApiKeyInput', 'saveApiKeyFromInput', 'setBookRating', 'deleteBookFromShelf'
-];
-
-fs.writeFileSync(path.join(root, 'src', 'register-globals.js'),
-`export function registerGlobals(App) {
-  const pick = (names) => Object.fromEntries(names.map(n => [n, App[n]]).filter(([, v]) => typeof v === 'function'));
-  Object.assign(window, pick(${JSON.stringify(handlers)}));
-}
 `);
 
 // boot.js is hand-maintained in src/boot.js

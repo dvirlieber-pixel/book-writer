@@ -27,13 +27,13 @@
 </div>
 <div id="update-banner" class="update-banner" role="alert">
   <span>גרסה חדשה של האפליקציה מוכנה</span>
-  <button type="button" class="banner-btn" onclick="applyAppUpdate()">רענן עכשיו</button>
-  <button type="button" class="banner-dismiss" onclick="dismissUpdateBanner()" aria-label="סגור">✕</button>
+  <button type="button" class="banner-btn" data-action="applyAppUpdate">רענן עכשיו</button>
+  <button type="button" class="banner-dismiss" data-action="dismissUpdateBanner" aria-label="סגור">✕</button>
 </div>
 <div id="app-install-banner" class="app-banner" role="dialog" aria-label="התקנת אפליקציה">
   <span>📲 התקן את ספריית האינסוף על המסך הראשי</span>
-  <button type="button" class="banner-btn" onclick="promptPwaInstall()">התקן</button>
-  <button type="button" class="banner-dismiss" onclick="dismissInstallBanner()" aria-label="סגור">✕</button>
+  <button type="button" class="banner-btn" data-action="promptPwaInstall">התקן</button>
+  <button type="button" class="banner-dismiss" data-action="dismissInstallBanner" aria-label="סגור">✕</button>
 </div>
 
 <!-- WELCOME SCREEN -->
@@ -61,13 +61,13 @@
     <div class="choice-section">
       <span class="choice-label">ז'אנר מוביל</span>
       <div class="choice-tiles" id="genre-tiles">
-        <button type="button" class="choice-tile" data-group="genre" data-value="fantasy" onclick="selectChoice(this)">🐉 פנטזיה</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="scifi" onclick="selectChoice(this)">🚀 מדע בדיוני</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="mystery" onclick="selectChoice(this)">🕵️‍♂️ מתח</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="horror" onclick="selectChoice(this)">🖤 אימה</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="romance" onclick="selectChoice(this)">❤️ רומן</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="historical" onclick="selectChoice(this)">⚔️ היסטורי</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="other" onclick="selectChoice(this)">✏️ אחר...</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="fantasy" data-action="selectChoice">🐉 פנטזיה</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="scifi" data-action="selectChoice">🚀 מדע בדיוני</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="mystery" data-action="selectChoice">🕵️‍♂️ מתח</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="horror" data-action="selectChoice">🖤 אימה</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="romance" data-action="selectChoice">❤️ רומן</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="historical" data-action="selectChoice">⚔️ היסטורי</button>
+        <button type="button" class="choice-tile" data-group="genre" data-value="other" data-action="selectChoice">✏️ אחר...</button>
       </div>
       <input type="text" id="genre-custom" class="optional-input" placeholder="ז'אנר אחר..." maxlength="80" />
     </div>
@@ -75,12 +75,12 @@
     <div class="choice-section">
       <span class="choice-label">אווירה וטון</span>
       <div class="choice-tiles" id="tone-tiles">
-        <button type="button" class="choice-tile" data-group="tone" data-value="grimdark" onclick="selectChoice(this)">🕯️ אפל</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="classic" onclick="selectChoice(this)">✨ קלאסי</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="action" onclick="selectChoice(this)">⚡ אקשן</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="humor" onclick="selectChoice(this)">☕ הומור</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="philosophical" onclick="selectChoice(this)">🧠 עמוק</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="other" onclick="selectChoice(this)">✏️ אחר...</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="grimdark" data-action="selectChoice">🕯️ אפל</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="classic" data-action="selectChoice">✨ קלאסי</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="action" data-action="selectChoice">⚡ אקשן</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="humor" data-action="selectChoice">☕ הומור</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="philosophical" data-action="selectChoice">🧠 עמוק</button>
+        <button type="button" class="choice-tile" data-group="tone" data-value="other" data-action="selectChoice">✏️ אחר...</button>
       </div>
       <input type="text" id="tone-custom" class="optional-input" placeholder="טון אחר..." maxlength="80" />
     </div>
@@ -99,24 +99,24 @@
       <div class="choice-section">
         <span class="choice-label">סופר</span>
         <div class="choice-tiles cols-3" id="author-tiles">
-          <button type="button" class="choice-tile" data-group="author" data-value="sanderson" onclick="selectChoice(this)">🎩 סנדרסון</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="martin" onclick="selectChoice(this)">👑 מרטין</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="rowling" onclick="selectChoice(this)">🔮 רולינג</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="christie" onclick="selectChoice(this)">🕵️‍♀️ כריסטי</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="dick" onclick="selectChoice(this)">👽 דיק</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="other" onclick="selectChoice(this)">✏️ אחר</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="sanderson" data-action="selectChoice">🎩 סנדרסון</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="martin" data-action="selectChoice">👑 מרטין</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="rowling" data-action="selectChoice">🔮 רולינג</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="christie" data-action="selectChoice">🕵️‍♀️ כריסטי</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="dick" data-action="selectChoice">👽 דיק</button>
+          <button type="button" class="choice-tile" data-group="author" data-value="other" data-action="selectChoice">✏️ אחר</button>
         </div>
         <input type="text" id="author-custom" class="optional-input" placeholder="סופר אחר..." maxlength="60" />
       </div>
       <div class="choice-section">
         <span class="choice-label">ספר</span>
         <div class="choice-tiles cols-3" id="bookref-tiles">
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="lotr" onclick="selectChoice(this)">💍 שר הטבעות</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="harry" onclick="selectChoice(this)">⚡ הארי פוטר</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="thrones" onclick="selectChoice(this)">🃏 משחקי הכס</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="dune" onclick="selectChoice(this)">🏜️ חולית</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="sherlock" onclick="selectChoice(this)">🕵️‍♂️ שרלוק</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="other" onclick="selectChoice(this)">✏️ אחר</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="lotr" data-action="selectChoice">💍 שר הטבעות</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="harry" data-action="selectChoice">⚡ הארי פוטר</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="thrones" data-action="selectChoice">🃏 משחקי הכס</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="dune" data-action="selectChoice">🏜️ חולית</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="sherlock" data-action="selectChoice">🕵️‍♂️ שרלוק</button>
+          <button type="button" class="choice-tile" data-group="bookRef" data-value="other" data-action="selectChoice">✏️ אחר</button>
         </div>
         <input type="text" id="bookref-custom" class="optional-input" placeholder="ספר אחר..." maxlength="60" />
       </div>
@@ -126,15 +126,15 @@
     <div class="choice-section">
       <span class="choice-label">אורך קריאה</span>
       <div class="length-options" id="length-presets">
-        <button type="button" class="length-btn selected" data-length="short" onclick="selectReadingLength(this, 'short')">
+        <button type="button" class="length-btn selected" data-length="short" data-action="selectReadingLength">
           <span class="chapters-count">קצר</span>
           <small class="length-hint">~שעה</small>
         </button>
-        <button type="button" class="length-btn" data-length="medium" onclick="selectReadingLength(this, 'medium')">
+        <button type="button" class="length-btn" data-length="medium" data-action="selectReadingLength">
           <span class="chapters-count">בינוני</span>
           <small class="length-hint">~ערב</small>
         </button>
-        <button type="button" class="length-btn" data-length="long" onclick="selectReadingLength(this, 'long')">
+        <button type="button" class="length-btn" data-length="long" data-action="selectReadingLength">
           <span class="chapters-count">ארוך</span>
           <small class="length-hint">מסע מלא</small>
         </button>
@@ -156,20 +156,19 @@
       <div class="key-input-area" style="margin-top:1rem">
         <label for="api-key-input">מפתח Gemini API</label>
         <div class="api-key-row">
-          <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off"
-            oninput="onApiKeyInput()" onblur="saveApiKeyFromInput()" />
-          <button type="button" class="api-show-key-btn" onclick="toggleApiKeyVisibility()">הצג</button>
+          <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" />
+          <button type="button" class="api-show-key-btn" data-action="toggleApiKeyVisibility">הצג</button>
         </div>
         <div class="api-key-status" id="api-key-status"></div>
         <div class="model-fallback-notice" id="welcome-model-fallback-notice" style="display:none" role="status"></div>
       </div>
     </details>
 
-    <button class="create-btn" id="create-btn" onclick="startBookCreation()">✦ פתח ספר חדש ✦</button>
-    <button type="button" class="taste-btn" style="width:100%;margin-top:0.75rem" onclick="startRandomBook()">🎲 ספר אקראי — הפתע אותי</button>
-    <button type="button" id="pwa-install-btn" class="taste-btn" style="width:100%;margin-top:0.5rem;display:none" onclick="promptPwaInstall()">📲 התקן כאפליקציה</button>
+    <button class="create-btn" id="create-btn" data-action="startBookCreation">✦ פתח ספר חדש ✦</button>
+    <button type="button" class="taste-btn" style="width:100%;margin-top:0.75rem" data-action="startRandomBook">🎲 ספר אקראי — הפתע אותי</button>
+    <button type="button" id="pwa-install-btn" class="taste-btn" style="width:100%;margin-top:0.5rem;display:none" data-action="promptPwaInstall">📲 התקן כאפליקציה</button>
     <div class="welcome-links" id="welcome-shelf-link" style="display:none">
-      <button type="button" onclick="showShelf()">← חזרה למדף הספרים</button>
+      <button type="button" data-action="showShelf">← חזרה למדף הספרים</button>
     </div>
     <div id="welcome-error" class="error-msg" style="display:none" role="alert" aria-live="assertive"></div>
   </div>
@@ -179,21 +178,21 @@
 <div id="shelf-screen" class="screen">
   <div class="shelf-header">
     <div class="title" style="font-family:'Frank Ruhl Libre',serif;font-size:1.4rem;color:var(--gold)">📚 המדף שלי</div>
-    <button type="button" class="theme-toggle-global" id="theme-toggle-shelf" onclick="toggleTheme()" title="מצב בהיר/כהה">☀</button>
-    <button class="new-book-btn" onclick="openWelcomeApiSettings()">🔑 מפתח API</button>
-    <button class="new-book-btn" onclick="openWelcomeNewBook()">+ ספר חדש</button>
+    <button type="button" class="theme-toggle-global" id="theme-toggle-shelf" data-action="toggleTheme" title="מצב בהיר/כהה">☀</button>
+    <button class="new-book-btn" data-action="openWelcomeApiSettings">🔑 מפתח API</button>
+    <button class="new-book-btn" data-action="openWelcomeNewBook">+ ספר חדש</button>
   </div>
   <div class="shelf-body">
     <div class="shelf-toolbar">
       <label>סינון</label>
-      <select id="shelf-filter" onchange="onShelfFilterChange(this.value)">
+      <select id="shelf-filter">
         <option value="all">הכל</option>
         <option value="reading">בקריאה</option>
         <option value="complete">הושלמו</option>
         <option value="series">סדרות</option>
       </select>
       <label>מיון</label>
-      <select id="shelf-sort" onchange="onShelfSortChange(this.value)">
+      <select id="shelf-sort">
         <option value="recent">חדש → ישן</option>
         <option value="rating">דירוג גבוה</option>
         <option value="title">שם א׳→ת׳</option>
@@ -201,10 +200,10 @@
     </div>
     <div class="shelf-grid" id="shelf-grid"></div>
     <div class="library-actions" style="margin-top:1.5rem">
-      <button type="button" class="secondary-btn" onclick="exportLibraryJson()" title="גיבוי ספרים והעדפות בלבד — ללא מפתח API">📂 גיבוי המדף (JSON)</button>
+      <button type="button" class="secondary-btn" data-action="exportLibraryJson" title="גיבוי ספרים והעדפות בלבד — ללא מפתח API">📂 גיבוי המדף (JSON)</button>
       <label class="secondary-btn" style="cursor:pointer;margin:0">
         📥 שחזור מדף
-        <input type="file" accept="application/json,.json" style="display:none" onchange="onImportLibraryFile(event)">
+        <input type="file" id="import-library-file" accept="application/json,.json" style="display:none">
       </label>
     </div>
   </div>
@@ -221,22 +220,22 @@
     <p id="sequel-parent-info" style="margin-bottom:1.25rem"></p>
     <p style="font-size:0.8rem;color:var(--gold-dim);margin-bottom:0.5rem">אורך ספר המשך</p>
     <div class="length-options" id="sequel-length-options">
-      <button type="button" class="length-btn selected" data-length="short" onclick="selectSequelLength(this, 'short')">
+      <button type="button" class="length-btn selected" data-length="short" data-action="selectSequelLength">
         <span class="chapters-count">קצר</span>
         <small class="length-hint">~שעה</small>
       </button>
-      <button type="button" class="length-btn" data-length="medium" onclick="selectSequelLength(this, 'medium')">
+      <button type="button" class="length-btn" data-length="medium" data-action="selectSequelLength">
         <span class="chapters-count">בינוני</span>
         <small class="length-hint">~ערב</small>
       </button>
-      <button type="button" class="length-btn" data-length="long" onclick="selectSequelLength(this, 'long')">
+      <button type="button" class="length-btn" data-length="long" data-action="selectSequelLength">
         <span class="chapters-count">ארוך</span>
         <small class="length-hint">מסע מלא</small>
       </button>
     </div>
-    <button class="create-btn" onclick="confirmSequelBook()">✦ פתח את ספר המשך ✦</button>
+    <button class="create-btn" data-action="confirmSequelBook">✦ פתח את ספר המשך ✦</button>
     <div class="welcome-links">
-      <button type="button" onclick="cancelSequelSetup()">ביטול</button>
+      <button type="button" data-action="cancelSequelSetup">ביטול</button>
     </div>
     <div id="sequel-error" class="error-msg" style="display:none" role="alert" aria-live="assertive"></div>
   </div>
@@ -248,7 +247,7 @@
   <div class="loading-title" id="loading-title">פותח ספר חדש...</div>
   <div class="loading-status" id="loading-status">מכין את הספר...</div>
   <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
-  <button type="button" class="loading-cancel-btn" id="loading-cancel-btn" onclick="cancelPendingBookCreation()">ביטול — חזרה לספרייה</button>
+  <button type="button" class="loading-cancel-btn" id="loading-cancel-btn" data-action="cancelPendingBookCreation">ביטול — חזרה לספרייה</button>
 </div>
 
 <!-- LIBRARY SCREEN -->
@@ -256,9 +255,9 @@
   <div class="library-header">
     <div class="title">📖 ספריית האינסוף</div>
     <div class="book-title-display" id="header-book-title"></div>
-    <button type="button" class="theme-toggle-global" id="theme-toggle-library" onclick="toggleTheme()" title="מצב בהיר/כהה">☀</button>
-    <button class="new-book-btn" onclick="showShelf()">מדף ספרים</button>
-    <button class="new-book-btn" onclick="openWelcomeNewBook()">+ חדש</button>
+    <button type="button" class="theme-toggle-global" id="theme-toggle-library" data-action="toggleTheme" title="מצב בהיר/כהה">☀</button>
+    <button class="new-book-btn" data-action="showShelf">מדף ספרים</button>
+    <button class="new-book-btn" data-action="openWelcomeNewBook">+ חדש</button>
   </div>
 
   <div class="library-body">
@@ -288,11 +287,10 @@
     </div>
 
     <div class="library-footer">
-      <button class="write-next-btn" id="write-next-btn" onclick="readNextChapter()">
+      <button class="write-next-btn" id="write-next-btn" data-action="readNextChapter">
         📖 התחל לקרוא
       </button>
-      <button type="button" class="secondary-btn prepare-next-btn" id="prepare-next-btn" style="display:none"
-        onclick="prepareNextChapter()" title="ייצור את הפרק הבא ברקע — צורך במפתח API, לא חובה">
+      <button type="button" class="secondary-btn prepare-next-btn" id="prepare-next-btn" style="display:none" data-action="prepareNextChapter" title="ייצור את הפרק הבא ברקע — צורך במפתח API, לא חובה">
         ⚡ הכן את הפרק הבא מראש
       </button>
       <div class="writing-indicator" id="writing-indicator" style="display:none">
@@ -309,15 +307,15 @@
 <!-- READING SCREEN -->
 <div id="reading-screen" class="screen">
   <div class="reading-header">
-    <button class="back-btn" onclick="showLibrary()">← חזרה</button>
+    <button class="back-btn" data-action="showLibrary">← חזרה</button>
     <div class="reading-chapter-label" id="reading-chapter-label"></div>
     <div class="reading-toolbar">
-      <button type="button" class="read-tool-btn" onclick="adjustFontSize(-0.08)" title="הקטן">A−</button>
-      <button type="button" class="read-tool-btn" onclick="adjustFontSize(0.08)" title="הגדל">A+</button>
-      <button type="button" class="read-tool-btn" onclick="toggleTheme()" title="מצב בהיר/כהה" id="theme-toggle-btn">☀</button>
-      <button type="button" class="read-tool-btn" id="landscape-toggle-btn" onclick="toggleReadingLandscape()" title="קריאה לרוחב (לחיצה מפורשת)">⤡</button>
-      <button type="button" class="read-tool-btn" id="immersive-toggle-btn" onclick="toggleReadingImmersive()" title="מצב קריאה מלאה">⛶</button>
-      <button type="button" class="read-tool-btn" id="wake-toggle-btn" onclick="toggleWakeLock()" title="מנע נעילת מסך">💡</button>
+      <button type="button" class="read-tool-btn" data-action="adjustFontSize" data-arg="-0.08" title="הקטן">A−</button>
+      <button type="button" class="read-tool-btn" data-action="adjustFontSize" data-arg="0.08" title="הגדל">A+</button>
+      <button type="button" class="read-tool-btn" data-action="toggleTheme" title="מצב בהיר/כהה" id="theme-toggle-btn">☀</button>
+      <button type="button" class="read-tool-btn" id="landscape-toggle-btn" data-action="toggleReadingLandscape" title="קריאה לרוחב (לחיצה מפורשת)">⤡</button>
+      <button type="button" class="read-tool-btn" id="immersive-toggle-btn" data-action="toggleReadingImmersive" title="מצב קריאה מלאה">⛶</button>
+      <button type="button" class="read-tool-btn" id="wake-toggle-btn" data-action="toggleWakeLock" title="מנע נעילת מסך">💡</button>
     </div>
   </div>
 
@@ -338,11 +336,11 @@
     <div class="chapter-end-actions" id="chapter-end-actions"></div>
   </div>
 
-  <div class="chapter-drawer-backdrop" id="chapter-drawer-backdrop" onclick="closeChapterDrawer()"></div>
+  <div class="chapter-drawer-backdrop" id="chapter-drawer-backdrop" data-action="closeChapterDrawer"></div>
   <aside class="chapter-drawer" id="chapter-drawer" aria-hidden="true">
     <div class="chapter-drawer-header">
       <span>פרקים זמינים</span>
-      <button type="button" class="chapter-drawer-close" onclick="closeChapterDrawer()" aria-label="סגור">✕</button>
+      <button type="button" class="chapter-drawer-close" data-action="closeChapterDrawer" aria-label="סגור">✕</button>
     </div>
     <div class="chapter-drawer-list" id="chapter-drawer-list"></div>
   </aside>

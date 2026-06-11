@@ -7,12 +7,14 @@
     "dev": "vite",
     "build": "node scripts/build-app-bundle.mjs && vite build",
     "bundle": "node scripts/build-app-bundle.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "jszip": "^3.10.1"
   },
   "devDependencies": {
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
   }
 }
