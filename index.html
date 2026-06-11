@@ -125,6 +125,7 @@
     color: var(--parchment);
     font-family: 'Noto Serif Hebrew', serif;
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-x: hidden;
     position: relative;
   }
@@ -1665,7 +1666,7 @@
     color: rgba(26, 20, 16, 0.75);
   }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
 <script src="DLSplash.jsx"></script>
 <script src="DLWatermark.jsx"></script>
 </head>
@@ -1799,7 +1800,7 @@
         <a class="api-guide-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">← איך מקבלים מפתח חינמי ב-Google AI Studio</a>
         <a class="api-guide-link" href="https://aistudio.google.com/usage" target="_blank" rel="noopener noreferrer">← מכסה ושימוש יומי</a>
         <div class="api-privacy-note">
-          🔒 המפתח נשמר רק בדפדפן שלך (localStorage). הוא לא נשלח לשרת שלנו — רק ישירות ממך ל-Google. אפשר למחוק אותו בכל עת על ידי ניקוי נתוני האתר.
+          🔒 המפתח נשמר רק במכשיר שלך (IndexedDB). הוא לא נשלח לשרת שלנו — רק ישירות ממך ל-Google. גיבוי המדף לא כולל את המפתח. אפשר למחוק בכל עת בניקוי נתוני האתר.
         </div>
       </div>
       <div class="key-input-area" style="margin-top:1rem">
@@ -1820,7 +1821,7 @@
     <div class="welcome-links" id="welcome-shelf-link" style="display:none">
       <button type="button" onclick="showShelf()">← חזרה למדף הספרים</button>
     </div>
-    <div id="welcome-error" class="error-msg" style="display:none"></div>
+    <div id="welcome-error" class="error-msg" style="display:none" role="alert" aria-live="assertive"></div>
   </div>
 </div>
 
@@ -1850,7 +1851,7 @@
     </div>
     <div class="shelf-grid" id="shelf-grid"></div>
     <div class="library-actions" style="margin-top:1.5rem">
-      <button type="button" class="secondary-btn" onclick="exportLibraryJson()">📂 גיבוי המדף (JSON)</button>
+      <button type="button" class="secondary-btn" onclick="exportLibraryJson()" title="גיבוי ספרים והעדפות בלבד — ללא מפתח API">📂 גיבוי המדף (JSON)</button>
       <label class="secondary-btn" style="cursor:pointer;margin:0">
         📥 שחזור מדף
         <input type="file" accept="application/json,.json" style="display:none" onchange="onImportLibraryFile(event)">
@@ -1887,7 +1888,7 @@
     <div class="welcome-links">
       <button type="button" onclick="cancelSequelSetup()">ביטול</button>
     </div>
-    <div id="sequel-error" class="error-msg" style="display:none"></div>
+    <div id="sequel-error" class="error-msg" style="display:none" role="alert" aria-live="assertive"></div>
   </div>
 </div>
 
@@ -1950,7 +1951,7 @@
       </div>
       <div class="library-actions" id="library-actions"></div>
       <div class="model-fallback-notice" id="library-model-fallback-notice" style="display:none" role="status"></div>
-      <div id="library-error" class="error-msg" style="display:none"></div>
+      <div id="library-error" class="error-msg" style="display:none" role="alert" aria-live="assertive"></div>
     </div>
   </div>
 </div>
@@ -2012,6 +2013,8 @@ const IDB_VERSION = 1;
 const IDB_STORE = 'kv';
 const GEMINI_FETCH_TIMEOUT_MS = 120000;
 const SAVE_DEBOUNCE_MS = 150;
+const IMPORT_MAX_BYTES = 50 * 1024 * 1024;
+const EXPORT_FORMAT_VERSION = 3;
 
 let idbPromise = null;
 let saveTimer = null;
@@ -3016,9 +3019,8 @@ function applyAppUpdate() {
 async function exportLibraryJson() {
   if (state.book && state.id) app.books[state.id] = bookSnapshot();
   const data = {
-    version: 2,
+    version: EXPORT_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
-    apiKey: app.apiKey || '',
     readingPrefs: app.readingPrefs,
     tasteProfiles: app.tasteProfiles,
     books: app.books || {}
@@ -3036,14 +3038,29 @@ function onImportLibraryFile(ev) {
   const file = ev.target.files?.[0];
   ev.target.value = '';
   if (!file) return;
+  if (file.size > IMPORT_MAX_BYTES) {
+    alert('הקובץ גדול מדי (מעל 50MB) — לא ניתן לייבא.');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = () => {
     try {
       const data = JSON.parse(reader.result);
       if (!data?.books || typeof data.books !== 'object') throw new Error('קובץ לא תקין');
+      if (data.version > EXPORT_FORMAT_VERSION) {
+        throw new Error('הקובץ מגרסה חדשה יותר — עדכן את האפליקציה');
+      }
       if (!confirm('לשחזר את המדף מהקובץ? ספרים קיימים יוחלפו.')) return;
       app.books = data.books;
-      if (data.apiKey) app.apiKey = data.apiKey;
+      if (data.apiKey) {
+        if (confirm('הקובץ מכיל מפתח API ישן. לייבא גם אותו למכשיר זה?')) {
+          app.apiKey = String(data.apiKey).trim();
+          state.apiKey = app.apiKey;
+          const keyInput = document.getElementById('api-key-input');
+          if (keyInput) keyInput.value = app.apiKey;
+          updateApiKeyStatus();
+        }
+      }
       if (data.readingPrefs) app.readingPrefs = { ...app.readingPrefs, ...data.readingPrefs };
       if (data.tasteProfiles?.length) app.tasteProfiles = data.tasteProfiles;
       migrateBooksInApp();
@@ -3584,7 +3601,7 @@ function saveApiKeyFromInput() {
 
 function toggleApiKeyVisibility() {
   const input = document.getElementById('api-key-input');
-  const btn = input?.nextElementSibling;
+  const btn = document.querySelector('.api-show-key-btn');
   if (!input) return;
   const show = input.type === 'password';
   input.type = show ? 'text' : 'password';
@@ -4255,6 +4272,7 @@ function cancelSequelSetup() {
 }
 
 async function confirmSequelBook() {
+  if (bookCreationInFlight || state.writing) return;
   if (!pendingSequelSourceId) {
     cancelSequelSetup();
     return;
@@ -4410,13 +4428,12 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   ensureMemoryBook();
   state.writing = true;
   state.generatingIdx = idx;
-  const outline = state.book.chapterOutlines[idx];
   const chapterNum = idx + 1;
+  const outline = state.book.chapterOutlines[idx]
+    || { title: `פרק ${chapterNum}`, summary: '', pov: '' };
 
   if (!background) {
-    document.getElementById('write-next-btn').disabled = true;
-    document.getElementById('writing-indicator').style.display = 'flex';
-    document.getElementById('library-error').style.display = 'none';
+    setWriteUiActive(true);
   } else {
     notifyReadingChapterPipeline(idx, true);
     updatePrepareNextButton();
@@ -4483,10 +4500,7 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
     state.generatingIdx = null;
     save();
 
-    if (!background) {
-      document.getElementById('writing-indicator').style.display = 'none';
-      document.getElementById('write-next-btn').disabled = false;
-    }
+    if (!background) setWriteUiActive(false);
     renderLibrary();
 
     if (openAfter) openChapter(idx);
@@ -4502,8 +4516,7 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
     notifyReadingChapterPipeline(idx, false);
     updatePrepareNextButton();
     if (!background) {
-      document.getElementById('write-next-btn').disabled = false;
-      document.getElementById('writing-indicator').style.display = 'none';
+      setWriteUiActive(false);
       if (useLoadingScreen) {
         showScreen('library-screen');
         showError('library-error', 'לא הצלחנו להכין את הפרק: ' + e.message);
@@ -4591,7 +4604,11 @@ async function readNextChapter() {
   if (state.writing) await waitForGeneration();
   const written = state.chapters.length;
   if (written === 0) {
-    try { await generateChapterAt(0, { openAfter: true }); } catch(e) {}
+    try {
+      await generateChapterAt(0, { openAfter: true });
+    } catch (e) {
+      showError('library-error', 'לא הצלחנו להכין את הפרק: ' + e.message);
+    }
     return;
   }
   const last = getReadingContinuationIndex();
@@ -4606,7 +4623,9 @@ async function readNextChapter() {
   }
   try {
     await generateChapterAt(nextToRead, { openAfter: true });
-  } catch(e) {}
+  } catch (e) {
+    showError('library-error', 'לא הצלחנו להכין את הפרק: ' + e.message);
+  }
 }
 
 async function continueFromChapter(currentIdx) {
@@ -5037,8 +5056,8 @@ function renderLibrary() {
     ? `<span>📜 ספר ${state.sequelIndex} · ${escapeHtml(state.seriesTitle || book.title)}</span>` : '';
 
   document.getElementById('book-meta').innerHTML =
-    `<span>📚 ${total} פרקים</span><span>✨ ${escapeHtml(book.genre || genreDisplayLabel())}</span>` +
-    `<span>🎭 ${escapeHtml(genreDisplayLabel())}</span><span>👁 ${writtenCount} זמינים</span>${seriesBadge}`;
+    `<span>📚 ${total} פרקים</span><span>✨ ${escapeHtml(genreDisplayLabel())}</span>` +
+    `<span>👁 ${writtenCount} זמינים</span>${seriesBadge}`;
   document.getElementById('book-tagline').textContent = book.tagline || '';
 
   // Progress
@@ -5315,6 +5334,15 @@ function openChapter(idx) {
 }
 
 // ===== UTILS =====
+function setWriteUiActive(active) {
+  const writeBtn = document.getElementById('write-next-btn');
+  const indicator = document.getElementById('writing-indicator');
+  const errEl = document.getElementById('library-error');
+  if (writeBtn) writeBtn.disabled = active;
+  if (indicator) indicator.style.display = active ? 'flex' : 'none';
+  if (active && errEl) errEl.style.display = 'none';
+}
+
 function showError(id, msg) {
   const el = document.getElementById(id);
   if (el) { el.textContent = msg; el.style.display = 'block'; }
@@ -5374,6 +5402,16 @@ function initAfterLoad() {
 }
 
 loadApp().then(initAfterLoad);
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('unhandled rejection', e.reason);
+  const msg = e.reason?.message || String(e.reason || 'שגיאה לא צפויה');
+  if (document.getElementById('library-screen')?.classList.contains('active')) {
+    showError('library-error', msg);
+  } else if (document.getElementById('welcome-screen')?.classList.contains('active')) {
+    showError('welcome-error', msg);
+  }
+});
 
 window.addEventListener('pagehide', () => {
   syncAppFromState();

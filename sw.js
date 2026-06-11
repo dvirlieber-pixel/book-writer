@@ -1,4 +1,4 @@
-const CACHE_NAME = 'seferiyat-hanetzach-v8';
+const CACHE_NAME = 'seferiyat-hanetzach-v9';
 
 const PRECACHE_URLS = [
   './',
@@ -11,6 +11,7 @@ const PRECACHE_URLS = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/screenshot-wide.png',
+  './icons/screenshot-narrow.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
   'https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@300;400;600;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap'
 ];
