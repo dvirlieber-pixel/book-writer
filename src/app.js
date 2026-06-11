@@ -166,7 +166,7 @@ function collectWelcomeProfile() {
   const bookRefCustom = document.getElementById('bookref-custom')?.value?.trim() || '';
   return {
     ...defaultBookProfile(),
-    ...welcomeDraft,
+    ...store.welcomeDraft,
     hook,
     genreCustom,
     toneCustom,
