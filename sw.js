@@ -1,9 +1,11 @@
-const CACHE_NAME = 'seferiyat-hanetzach-v7';
+const CACHE_NAME = 'seferiyat-hanetzach-v8';
 
 const PRECACHE_URLS = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './DLSplash.jsx',
+  './DLWatermark.jsx',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',

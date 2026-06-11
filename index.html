@@ -1894,7 +1894,7 @@
 <!-- LOADING SCREEN -->
 <div id="loading-screen" class="screen">
   <div class="loading-rune">⚙</div>
-  <div class="loading-title">פותח ספר חדש...</div>
+  <div class="loading-title" id="loading-title">פותח ספר חדש...</div>
   <div class="loading-status" id="loading-status">מכין את הספר...</div>
   <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
   <button type="button" class="loading-cancel-btn" id="loading-cancel-btn" onclick="cancelPendingBookCreation()">ביטול — חזרה לספרייה</button>
@@ -2603,7 +2603,14 @@ function save() {
     if (state.apiKey) app.apiKey = state.apiKey;
     if (state.id) app.currentBookId = state.id;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(app));
-  } catch(e) {}
+  } catch (e) {
+    console.error('save failed', e);
+    if (e.name === 'QuotaExceededError' || e.code === 22) {
+      const msg = 'אין מספיק מקום באחסון — שחרר מקום או מחק ספרים מהמדף.';
+      showError('library-error', msg);
+      showError('welcome-error', msg);
+    }
+  }
 }
 
 function load() {
@@ -3669,7 +3676,9 @@ function showScreen(id) {
     lockAppOrientation();
   }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  const screen = document.getElementById(id);
+  if (!screen) return;
+  screen.classList.add('active');
   window.scrollTo(0, 0);
   applyReadingPrefs();
   updateLandscapeToggleButton();
@@ -3926,6 +3935,7 @@ function mergeContinuation(existing, continuation) {
 
 // ===== BOOK CREATION =====
 async function startBookCreation() {
+  if (bookCreationInFlight || state.writing) return;
   if (!navigator.onLine) {
     showError('welcome-error', 'אין חיבור רשת — יצירת ספר חדש דורשת אינטרנט. אפשר לקרוא ספרים שכבר במדף.');
     return;
@@ -4900,7 +4910,7 @@ function renderLibrary() {
   }
 
   const seriesBadge = state.sequelIndex > 1
-    ? `<span>📜 ספר ${state.sequelIndex} · ${state.seriesTitle || book.title}</span>` : '';
+    ? `<span>📜 ספר ${state.sequelIndex} · ${escapeHtml(state.seriesTitle || book.title)}</span>` : '';
 
   document.getElementById('book-meta').innerHTML =
     `<span>📚 ${total} פרקים</span><span>✨ ${escapeHtml(book.genre || genreDisplayLabel())}</span>` +
@@ -4935,8 +4945,8 @@ function renderLibrary() {
     btn.innerHTML = `
       <span class="chapter-num">${i+1}</span>
       <div class="chapter-info">
-        <div class="chapter-name">${isWritten || isNext ? outline.title : '???'}</div>
-        <div class="chapter-hint">${isWritten ? `נקודת מבט: ${outline.pov}` : isPreparing ? 'בהכנה...' : isNext ? 'לחץ "המשך לקרוא"' : 'יקריא לאחר הפרקים הקודמים'}</div>
+        <div class="chapter-name">${isWritten || isNext ? escapeHtml(outline.title) : '???'}</div>
+        <div class="chapter-hint">${isWritten ? `נקודת מבט: ${escapeHtml(outline.pov)}` : isPreparing ? 'בהכנה...' : isNext ? 'לחץ "המשך לקרוא"' : 'יקריא לאחר הפרקים הקודמים'}</div>
       </div>
       ${statusLabel}
     `;
@@ -5026,8 +5036,8 @@ function renderChapterDrawerList(currentIdx) {
     btn.innerHTML = `
       <span class="drawer-chapter-num">${ch.number}</span>
       <span style="flex:1">
-        <div style="font-weight:600">${ch.title}</div>
-        ${outline?.pov ? `<div style="font-size:0.72rem;opacity:0.55;margin-top:0.15rem">${outline.pov}</div>` : ''}
+        <div style="font-weight:600">${escapeHtml(ch.title)}</div>
+        ${outline?.pov ? `<div style="font-size:0.72rem;opacity:0.55;margin-top:0.15rem">${escapeHtml(outline.pov)}</div>` : ''}
       </span>
       ${i === currentIdx ? '<span style="font-size:0.75rem;color:var(--gold)">●</span>' : ''}`;
     btn.onclick = () => {
@@ -5116,7 +5126,7 @@ function openChapter(idx) {
       if (p === '***' || p === '* * *') {
         return '<div class="chapter-divider">✦ ✦ ✦</div>';
       }
-      return `<p>${p}</p>`;
+      return `<p>${escapeHtml(p)}</p>`;
     })
     .join('');
 
@@ -5278,12 +5288,16 @@ function bootstrapAppScreens() {
   }
 }
 
-initDLSplash(() => {
-  expirePendingCreationIfStale();
-  tryResumePendingCreation().then(resumed => {
-    if (!resumed) bootstrapAppScreens();
-  });
-});
+(function bootstrapAfterSplash() {
+  const run = () => {
+    expirePendingCreationIfStale();
+    tryResumePendingCreation().then(resumed => {
+      if (!resumed) bootstrapAppScreens();
+    });
+  };
+  if (typeof initDLSplash === 'function') initDLSplash(run);
+  else run();
+})();
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeChapterDrawer();
