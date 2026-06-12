@@ -45,128 +45,175 @@
   </div>
 
   <div class="welcome-card">
-    <h2>ספר חדש מחכה לך</h2>
-    <p>בחר ז'אנר, טון, או רעיון — ולחץ "פתח ספר". הפרקים נבנים מאחורי הקלעים. מספיק <strong>בחירה אחת</strong> מהמסך (או רעיון חופשי).</p>
-
-    <div class="taste-profiles">
-      <div class="taste-profiles-label">פרופילים שמורים (ז'אנר + טון + אורך)</div>
-      <div class="profile-options" id="profile-options"></div>
-    </div>
-
-    <div class="choice-section">
-      <label class="choice-label">רעיון לספר (אופציונלי)</label>
-      <textarea id="hook-input" class="hook-field" placeholder="למשל: בלש פרטי בתל אביב חוקר רצח מסתורי. אם תשאיר ריק — נמציא."></textarea>
-    </div>
-
-    <div class="choice-section">
-      <span class="choice-label">ז'אנר מוביל</span>
-      <div class="choice-tiles" id="genre-tiles">
-        <button type="button" class="choice-tile" data-group="genre" data-value="fantasy" data-action="selectChoice">🐉 פנטזיה</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="scifi" data-action="selectChoice">🚀 מדע בדיוני</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="mystery" data-action="selectChoice">🕵️‍♂️ מתח</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="horror" data-action="selectChoice">🖤 אימה</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="romance" data-action="selectChoice">❤️ רומן</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="historical" data-action="selectChoice">⚔️ היסטורי</button>
-        <button type="button" class="choice-tile" data-group="genre" data-value="other" data-action="selectChoice">✏️ אחר...</button>
-      </div>
-      <input type="text" id="genre-custom" class="optional-input" placeholder="ז'אנר אחר..." maxlength="80" />
-    </div>
-
-    <div class="choice-section">
-      <span class="choice-label">אווירה וטון</span>
-      <div class="choice-tiles" id="tone-tiles">
-        <button type="button" class="choice-tile" data-group="tone" data-value="grimdark" data-action="selectChoice">🕯️ אפל</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="classic" data-action="selectChoice">✨ קלאסי</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="action" data-action="selectChoice">⚡ אקשן</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="humor" data-action="selectChoice">☕ הומור</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="philosophical" data-action="selectChoice">🧠 עמוק</button>
-        <button type="button" class="choice-tile" data-group="tone" data-value="other" data-action="selectChoice">✏️ אחר...</button>
-      </div>
-      <input type="text" id="tone-custom" class="optional-input" placeholder="טון אחר..." maxlength="80" />
-    </div>
-
-    <details class="inspiration-panel" id="inspiration-panel">
-      <summary class="inspiration-panel-trigger" aria-expanded="false">
-        <span class="inspiration-panel-icon" aria-hidden="true">✦</span>
-        <span class="inspiration-panel-text">
-          <strong>השראה מתקדמת</strong>
-          <span class="inspiration-panel-hint">סופר · ספר מוכר — לחץ כאן להרחבה (אופציונלי)</span>
-        </span>
-        <span class="inspiration-chevron" aria-hidden="true">▼</span>
-      </summary>
-      <div class="inspiration-panel-body">
-      <p class="copyright-note">השראה בלבד — לא חיקוי דמויות, עלילות או סגנון מועתק.</p>
-      <div class="choice-section">
-        <span class="choice-label">סופר</span>
-        <div class="choice-tiles cols-3" id="author-tiles">
-          <button type="button" class="choice-tile" data-group="author" data-value="sanderson" data-action="selectChoice">🎩 סנדרסון</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="martin" data-action="selectChoice">👑 מרטין</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="rowling" data-action="selectChoice">🔮 רולינג</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="christie" data-action="selectChoice">🕵️‍♀️ כריסטי</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="dick" data-action="selectChoice">👽 דיק</button>
-          <button type="button" class="choice-tile" data-group="author" data-value="other" data-action="selectChoice">✏️ אחר</button>
-        </div>
-        <input type="text" id="author-custom" class="optional-input" placeholder="סופר אחר..." maxlength="60" />
-      </div>
-      <div class="choice-section">
-        <span class="choice-label">ספר</span>
-        <div class="choice-tiles cols-3" id="bookref-tiles">
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="lotr" data-action="selectChoice">💍 שר הטבעות</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="harry" data-action="selectChoice">⚡ הארי פוטר</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="thrones" data-action="selectChoice">🃏 משחקי הכס</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="dune" data-action="selectChoice">🏜️ חולית</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="sherlock" data-action="selectChoice">🕵️‍♂️ שרלוק</button>
-          <button type="button" class="choice-tile" data-group="bookRef" data-value="other" data-action="selectChoice">✏️ אחר</button>
-        </div>
-        <input type="text" id="bookref-custom" class="optional-input" placeholder="ספר אחר..." maxlength="60" />
-      </div>
-      </div>
-    </details>
-
-    <div class="choice-section">
-      <span class="choice-label">אורך קריאה</span>
-      <div class="length-options" id="length-presets">
-        <button type="button" class="length-btn selected" data-length="short" data-action="selectReadingLength">
-          <span class="chapters-count">קצר</span>
-          <small class="length-hint">~שעה</small>
+    <div class="welcome-wizard" id="welcome-wizard">
+      <nav class="wizard-progress" id="wizard-progress" aria-label="שלבי יצירת ספר">
+        <button type="button" class="wizard-progress-step active" data-wizard-step="1" data-action="goToWizardStep" data-arg="1" aria-current="step">
+          <span class="wizard-progress-num">1</span>
+          <span class="wizard-progress-label">רעיון</span>
         </button>
-        <button type="button" class="length-btn" data-length="medium" data-action="selectReadingLength">
-          <span class="chapters-count">בינוני</span>
-          <small class="length-hint">~ערב</small>
+        <span class="wizard-progress-line" aria-hidden="true"></span>
+        <button type="button" class="wizard-progress-step" data-wizard-step="2" data-action="goToWizardStep" data-arg="2">
+          <span class="wizard-progress-num">2</span>
+          <span class="wizard-progress-label">הגדרות</span>
         </button>
-        <button type="button" class="length-btn" data-length="long" data-action="selectReadingLength">
-          <span class="chapters-count">ארוך</span>
-          <small class="length-hint">מסע מלא</small>
+        <span class="wizard-progress-line" aria-hidden="true"></span>
+        <button type="button" class="wizard-progress-step" data-wizard-step="3" data-action="goToWizardStep" data-arg="3">
+          <span class="wizard-progress-num">3</span>
+          <span class="wizard-progress-label">יצירה</span>
         </button>
+      </nav>
+
+      <!-- שלב 1: רעיון והשראה -->
+      <div class="wizard-step wizard-step-active" id="wizard-step-1" data-wizard-step="1" role="tabpanel" aria-labelledby="wizard-step-1-title">
+        <h2 id="wizard-step-1-title">מה תרצה לקרוא?</h2>
+        <p class="wizard-step-desc">מספיק <strong>בחירה אחת</strong> — ז'אנר, רעיון חופשי, או פרופיל שמור.</p>
+
+        <div class="taste-profiles">
+          <div class="taste-profiles-label">פרופילים שמורים (ז'אנר + טון + אורך)</div>
+          <div class="profile-options" id="profile-options"></div>
+        </div>
+
+        <div class="choice-section">
+          <label class="choice-label" for="hook-input">רעיון לספר (אופציונלי)</label>
+          <textarea id="hook-input" class="hook-field" placeholder="למשל: בלש פרטי בתל אביב חוקר רצח מסתורי. אם תשאיר ריק — נמציא."></textarea>
+        </div>
+
+        <div class="choice-section">
+          <span class="choice-label">ז'אנר מוביל</span>
+          <div class="choice-tiles" id="genre-tiles">
+            <button type="button" class="choice-tile" data-group="genre" data-value="fantasy" data-action="selectChoice">🐉 פנטזיה</button>
+            <button type="button" class="choice-tile" data-group="genre" data-value="scifi" data-action="selectChoice">🚀 מדע בדיוני</button>
+            <button type="button" class="choice-tile" data-group="genre" data-value="mystery" data-action="selectChoice">🕵️‍♂️ מתח</button>
+            <button type="button" class="choice-tile" data-group="genre" data-value="horror" data-action="selectChoice">🖤 אימה</button>
+            <button type="button" class="choice-tile" data-group="genre" data-value="romance" data-action="selectChoice">❤️ רומן</button>
+            <button type="button" class="choice-tile" data-group="genre" data-value="historical" data-action="selectChoice">⚔️ היסטורי</button>
+            <button type="button" class="choice-tile" data-group="genre" data-value="other" data-action="selectChoice">✏️ אחר...</button>
+          </div>
+          <input type="text" id="genre-custom" class="optional-input" placeholder="ז'אנר אחר..." maxlength="80" />
+        </div>
+
+        <details class="inspiration-panel" id="inspiration-panel">
+          <summary class="inspiration-panel-trigger" aria-expanded="false">
+            <span class="inspiration-panel-icon" aria-hidden="true">✦</span>
+            <span class="inspiration-panel-text">
+              <strong>השראה מתקדמת</strong>
+              <span class="inspiration-panel-hint">סופר · ספר מוכר — אופציונלי</span>
+            </span>
+            <span class="inspiration-chevron" aria-hidden="true">▼</span>
+          </summary>
+          <div class="inspiration-panel-body">
+            <p class="copyright-note">השראה בלבד — לא חיקוי דמויות, עלילות או סגנון מועתק.</p>
+            <div class="choice-section">
+              <span class="choice-label">סופר</span>
+              <div class="choice-tiles cols-3" id="author-tiles">
+                <button type="button" class="choice-tile" data-group="author" data-value="sanderson" data-action="selectChoice">🎩 סנדרסון</button>
+                <button type="button" class="choice-tile" data-group="author" data-value="martin" data-action="selectChoice">👑 מרטין</button>
+                <button type="button" class="choice-tile" data-group="author" data-value="rowling" data-action="selectChoice">🔮 רולינג</button>
+                <button type="button" class="choice-tile" data-group="author" data-value="christie" data-action="selectChoice">🕵️‍♀️ כריסטי</button>
+                <button type="button" class="choice-tile" data-group="author" data-value="dick" data-action="selectChoice">👽 דיק</button>
+                <button type="button" class="choice-tile" data-group="author" data-value="other" data-action="selectChoice">✏️ אחר</button>
+              </div>
+              <input type="text" id="author-custom" class="optional-input" placeholder="סופר אחר..." maxlength="60" />
+            </div>
+            <div class="choice-section">
+              <span class="choice-label">ספר</span>
+              <div class="choice-tiles cols-3" id="bookref-tiles">
+                <button type="button" class="choice-tile" data-group="bookRef" data-value="lotr" data-action="selectChoice">💍 שר הטבעות</button>
+                <button type="button" class="choice-tile" data-group="bookRef" data-value="harry" data-action="selectChoice">⚡ הארי פוטר</button>
+                <button type="button" class="choice-tile" data-group="bookRef" data-value="thrones" data-action="selectChoice">🃏 משחקי הכס</button>
+                <button type="button" class="choice-tile" data-group="bookRef" data-value="dune" data-action="selectChoice">🏜️ חולית</button>
+                <button type="button" class="choice-tile" data-group="bookRef" data-value="sherlock" data-action="selectChoice">🕵️‍♂️ שרלוק</button>
+                <button type="button" class="choice-tile" data-group="bookRef" data-value="other" data-action="selectChoice">✏️ אחר</button>
+              </div>
+              <input type="text" id="bookref-custom" class="optional-input" placeholder="ספר אחר..." maxlength="60" />
+            </div>
+          </div>
+        </details>
+
+        <div class="wizard-nav">
+          <button type="button" class="wizard-skip-btn" id="wizard-skip-to-create" data-action="goToWizardStep" data-arg="3" style="display:none">⚡ דלג ליצירה</button>
+          <button type="button" class="wizard-next-btn" data-action="nextWizardStep">הבא ←</button>
+        </div>
+      </div>
+
+      <!-- שלב 2: הגדרות הספר -->
+      <div class="wizard-step" id="wizard-step-2" data-wizard-step="2" role="tabpanel" aria-labelledby="wizard-step-2-title" hidden>
+        <h2 id="wizard-step-2-title">אווירה ואורך</h2>
+        <p class="wizard-step-desc">בחרו את הטון וכמה זמן תרצו להשקיע בקריאה.</p>
+
+        <div class="choice-section">
+          <span class="choice-label">אווירה וטון</span>
+          <div class="choice-tiles" id="tone-tiles">
+            <button type="button" class="choice-tile" data-group="tone" data-value="grimdark" data-action="selectChoice">🕯️ אפל</button>
+            <button type="button" class="choice-tile" data-group="tone" data-value="classic" data-action="selectChoice">✨ קלאסי</button>
+            <button type="button" class="choice-tile" data-group="tone" data-value="action" data-action="selectChoice">⚡ אקשן</button>
+            <button type="button" class="choice-tile" data-group="tone" data-value="humor" data-action="selectChoice">☕ הומור</button>
+            <button type="button" class="choice-tile" data-group="tone" data-value="philosophical" data-action="selectChoice">🧠 עמוק</button>
+            <button type="button" class="choice-tile" data-group="tone" data-value="other" data-action="selectChoice">✏️ אחר...</button>
+          </div>
+          <input type="text" id="tone-custom" class="optional-input" placeholder="טון אחר..." maxlength="80" />
+        </div>
+
+        <div class="choice-section">
+          <span class="choice-label">אורך קריאה</span>
+          <div class="length-options wizard-length-options" id="length-presets">
+            <button type="button" class="length-btn selected" data-length="short" data-action="selectReadingLength">
+              <span class="chapters-count">קצר</span>
+              <small class="length-hint">~שעה</small>
+            </button>
+            <button type="button" class="length-btn" data-length="medium" data-action="selectReadingLength">
+              <span class="chapters-count">בינוני</span>
+              <small class="length-hint">~ערב</small>
+            </button>
+            <button type="button" class="length-btn" data-length="long" data-action="selectReadingLength">
+              <span class="chapters-count">ארוך</span>
+              <small class="length-hint">מסע מלא</small>
+            </button>
+          </div>
+        </div>
+
+        <div class="wizard-nav">
+          <button type="button" class="wizard-back-btn" data-action="prevWizardStep">→ הקודם</button>
+          <button type="button" class="wizard-next-btn" data-action="nextWizardStep">הבא ←</button>
+        </div>
+      </div>
+
+      <!-- שלב 3: מפתח API ויצירה -->
+      <div class="wizard-step" id="wizard-step-3" data-wizard-step="3" role="tabpanel" aria-labelledby="wizard-step-3-title" hidden>
+        <h2 id="wizard-step-3-title">מוכנים לפתוח?</h2>
+        <p class="wizard-step-desc" id="wizard-step-3-desc">הזינו מפתח Gemini חינמי — נשמר רק במכשיר שלכם.</p>
+
+        <div class="api-settings wizard-api-panel" id="api-settings-details">
+          <div class="api-info-box">
+            <strong>למה צריך מפתח?</strong>
+            האפליקציה יוצרת פרקים דרך Google Gemini. כל משתמש מביא <strong>מפתח חינמי משלו</strong> — אין מפתח מרכזי, ואין חיוב דרכנו.
+            <a class="api-guide-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">← איך מקבלים מפתח חינמי ב-Google AI Studio</a>
+            <a class="api-guide-link" href="https://aistudio.google.com/usage" target="_blank" rel="noopener noreferrer">← מכסה ושימוש יומי</a>
+            <div class="api-privacy-note">
+              🔒 המפתח נשמר רק במכשיר שלך (IndexedDB). הוא לא נשלח לשרת שלנו — רק ישירות ממך ל-Google.
+            </div>
+          </div>
+          <div class="key-input-area">
+            <label for="api-key-input">מפתח Gemini API</label>
+            <div class="api-key-row">
+              <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" />
+              <button type="button" class="api-show-key-btn" data-action="toggleApiKeyVisibility">הצג</button>
+            </div>
+            <div class="api-key-status" id="api-key-status"></div>
+            <div class="model-fallback-notice" id="welcome-model-fallback-notice" style="display:none" role="status"></div>
+          </div>
+        </div>
+
+        <button class="create-btn" id="create-btn" data-action="startBookCreation">✦ פתח ספר חדש ✦</button>
+        <button type="button" class="taste-btn wizard-secondary-action" data-action="startRandomBook">🎲 ספר אקראי — הפתע אותי</button>
+        <button type="button" id="pwa-install-btn" class="taste-btn wizard-secondary-action" style="display:none" data-action="promptPwaInstall">📲 התקן כאפליקציה</button>
+
+        <div class="wizard-nav wizard-nav-end">
+          <button type="button" class="wizard-back-btn" data-action="prevWizardStep">→ הקודם</button>
+        </div>
       </div>
     </div>
 
-    <details class="api-settings" id="api-settings-details">
-      <summary>🔑 המפתח שלך (חובה פעם אחת)</summary>
-      <div class="api-info-box">
-        <strong>למה צריך מפתח?</strong>
-        האפליקציה יוצרת פרקים דרך Google Gemini. כל משתמש מביא <strong>מפתח חינמי משלו</strong> — אין מפתח מרכזי, ואין חיוב דרכנו.
-        תכנון וסיכומים רצים על Gemini 3.1 Flash-Lite; כתיבת הפרוזה על 3.5 Flash — כדי לחסוך מכסה. פרקים נוצרים רק בלחיצה על "המשך לקרוא" (או "הכן מראש" אופציונלי).
-        <a class="api-guide-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">← איך מקבלים מפתח חינמי ב-Google AI Studio</a>
-        <a class="api-guide-link" href="https://aistudio.google.com/usage" target="_blank" rel="noopener noreferrer">← מכסה ושימוש יומי</a>
-        <div class="api-privacy-note">
-          🔒 המפתח נשמר רק במכשיר שלך (IndexedDB). הוא לא נשלח לשרת שלנו — רק ישירות ממך ל-Google. גיבוי המדף לא כולל את המפתח. אפשר למחוק בכל עת בניקוי נתוני האתר.
-        </div>
-      </div>
-      <div class="key-input-area" style="margin-top:1rem">
-        <label for="api-key-input">מפתח Gemini API</label>
-        <div class="api-key-row">
-          <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" />
-          <button type="button" class="api-show-key-btn" data-action="toggleApiKeyVisibility">הצג</button>
-        </div>
-        <div class="api-key-status" id="api-key-status"></div>
-        <div class="model-fallback-notice" id="welcome-model-fallback-notice" style="display:none" role="status"></div>
-      </div>
-    </details>
-
-    <button class="create-btn" id="create-btn" data-action="startBookCreation">✦ פתח ספר חדש ✦</button>
-    <button type="button" class="taste-btn" style="width:100%;margin-top:0.75rem" data-action="startRandomBook">🎲 ספר אקראי — הפתע אותי</button>
-    <button type="button" id="pwa-install-btn" class="taste-btn" style="width:100%;margin-top:0.5rem;display:none" data-action="promptPwaInstall">📲 התקן כאפליקציה</button>
     <div class="welcome-links" id="welcome-shelf-link" style="display:none">
       <button type="button" data-action="showShelf">← חזרה למדף הספרים</button>
     </div>

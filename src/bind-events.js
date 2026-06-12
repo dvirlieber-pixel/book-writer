@@ -1,5 +1,5 @@
 const WITH_ELEMENT = new Set(['selectChoice', 'selectReadingLength', 'selectSequelLength']);
-const WITH_NUMERIC_ARG = new Set(['adjustFontSize']);
+const WITH_NUMERIC_ARG = new Set(['adjustFontSize', 'goToWizardStep']);
 
 export function bindEvents(App) {
   document.addEventListener('click', (e) => {

@@ -331,11 +331,15 @@ function toggleApiKeyVisibility() {
 }
 
 function openWelcomeApiSettings() {
-  openWelcomeNewBook();
-  const details = document.getElementById('api-settings-details');
-  if (details) details.open = true;
-  updateApiKeyStatus();
-  setTimeout(() => document.getElementById('api-key-input')?.focus(), 100);
+  if (state.book && state.id) {
+    app.books[state.id] = bookSnapshot();
+    save();
+  }
+  showScreen('welcome-screen');
+  updateWelcomeShelfLink();
+  document.getElementById('create-btn').disabled = false;
+  syncWelcomeApiKeyField();
+  setWelcomeWizardStep(3, { focusApi: true });
 }
 
 function setWritingStatus(msg) {

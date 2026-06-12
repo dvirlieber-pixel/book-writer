@@ -8,14 +8,14 @@ async function startBookCreation() {
   }
   const apiKey = getStoredApiKey();
   if (!apiKey) {
-    const details = document.getElementById('api-settings-details');
-    if (details) details.open = true;
-    showError('welcome-error', 'נדרש מפתח Gemini אישי. פתח את "המפתח שלך" למעלה, או קבל מפתח חינמי ב-Google AI Studio.');
+    setWelcomeWizardStep(3, { focusApi: true });
+    showError('welcome-error', 'נדרש מפתח Gemini אישי. הזן מפתח בשלב 3, או קבל מפתח חינמי ב-Google AI Studio.');
     return;
   }
 
   const profile = collectWelcomeProfile();
   if (!validateWelcomeSelections(profile)) {
+    resetWelcomeWizard(1);
     showError('welcome-error', 'בחר לפחות אחד: ז\'אנר, טון, סופר, ספר, או רעיון חופשי.');
     return;
   }

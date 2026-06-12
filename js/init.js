@@ -13,8 +13,7 @@ function initAfterLoad() {
   }
   updateApiKeyStatus();
   refreshModelFallbackNotice();
-  const apiDetails = document.getElementById('api-settings-details');
-  if (apiDetails && !getStoredApiKey()) apiDetails.open = true;
+  updateWelcomeWizardUI();
   (function bootstrapAfterSplash() {
     const run = () => {
       expirePendingCreationIfStale();

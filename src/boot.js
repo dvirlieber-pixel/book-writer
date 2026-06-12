@@ -26,8 +26,7 @@ export function boot(App) {
     }
     App.updateApiKeyStatus();
     App.refreshModelFallbackNotice();
-    const apiDetails = document.getElementById('api-settings-details');
-    if (apiDetails && !App.getStoredApiKey()) apiDetails.open = true;
+    App.updateWelcomeWizardUI();
     bootstrapAfterSplash();
   }
 

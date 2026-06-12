@@ -127,6 +127,7 @@ function openWelcomeNewBook() {
     save();
   }
   showScreen('welcome-screen');
+  resetWelcomeWizard(1);
   updateWelcomeShelfLink();
   document.getElementById('create-btn').disabled = false;
 }
