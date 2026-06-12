@@ -10,7 +10,7 @@ const legacyDir = path.join(root, 'js');
 
 const ORDER = [
   'book.js', 'storage.js', 'prefs-export.js', 'shelf.js', 'creation-resume.js',
-  'screens.js', 'api.js', 'book-create.js', 'chapters.js', 'library.js', 'reading.js', 'utils.js'
+  'screens.js', 'api.js', 'book-create.js', 'chapters.js', 'library.js', 'world-dictionary.js', 'reading.js', 'utils.js'
 ];
 
 const CONST_NAMES = [

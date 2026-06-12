@@ -124,4 +124,5 @@ function renderLibrary() {
 
   updatePrepareNextButton();
   renderLibraryActions();
+  renderWorldDictionaryLibraryEntry();
 }

@@ -716,6 +716,49 @@
     line-height: 1.6;
   }
 
+  .world-dict-entry-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    margin-bottom: 1rem;
+    padding: 0.85rem 1rem;
+    background: var(--gold-fill-soft);
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    color: var(--parchment);
+    font-family: inherit;
+    text-align: right;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .world-dict-entry-btn:hover {
+    border-color: var(--gold);
+    background: var(--gold-fill-mid);
+  }
+  .world-dict-entry-icon { font-size: 1.35rem; flex-shrink: 0; }
+  .world-dict-entry-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+  .world-dict-entry-text strong {
+    font-family: 'Frank Ruhl Libre', serif;
+    color: var(--gold);
+    font-size: 0.95rem;
+  }
+  .world-dict-entry-hint {
+    font-size: 0.75rem;
+    color: var(--text-faint);
+  }
+  .world-dict-entry-chevron {
+    color: var(--gold-dim);
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
   /* Progress bar */
   .progress-section {
     margin-bottom: 1rem;
@@ -1763,6 +1806,229 @@
   }
   .drawer-chapter-item.current .drawer-chapter-num { color: var(--gold); }
   .drawer-empty-msg { padding: 1rem; font-size: 0.85rem; }
+
+  /* World dictionary drawer */
+  .world-dict-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    z-index: 55;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .world-dict-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .world-dictionary-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: min(420px, 94vw);
+    height: 100%;
+    height: 100dvh;
+    z-index: 60;
+    background: var(--drawer-bg);
+    border-left: 1px solid rgba(201,168,76,0.25);
+    box-shadow: -8px 0 40px var(--footer-shadow);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.28s ease;
+  }
+  .world-dictionary-drawer.open { transform: translateX(0); }
+
+  .world-dict-drawer-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1.1rem 1.15rem;
+    border-bottom: 1px solid rgba(201,168,76,0.2);
+    flex-shrink: 0;
+  }
+  .world-dict-drawer-kicker { font-size: 1.1rem; }
+  .world-dict-drawer-title {
+    font-family: 'Frank Ruhl Libre', serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: var(--gold);
+    margin: 0.15rem 0 0;
+  }
+  .world-dict-drawer-sub {
+    font-size: 0.75rem;
+    color: var(--text-faint);
+    margin: 0.25rem 0 0;
+    line-height: 1.4;
+  }
+  .world-dict-drawer-close {
+    background: none;
+    border: 1px solid rgba(201,168,76,0.3);
+    color: var(--gold-dim);
+    width: 2rem;
+    height: 2rem;
+    font-size: 1rem;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+
+  .world-dict-tabs {
+    display: flex;
+    gap: 0.35rem;
+    padding: 0.65rem 0.75rem;
+    overflow-x: auto;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .world-dict-tabs::-webkit-scrollbar { display: none; }
+
+  .world-dict-tab {
+    flex-shrink: 0;
+    background: var(--surface-subtle);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.72rem;
+    padding: 0.4rem 0.65rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .world-dict-tab.active {
+    background: var(--gold-fill-mid);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .world-dict-tab-count {
+    opacity: 0.75;
+    font-size: 0.68rem;
+  }
+
+  .world-dict-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 1.1rem 1.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .world-dict-overview {
+    background: var(--gold-fill-soft);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 0.85rem 0.9rem;
+    margin-bottom: 1rem;
+    font-size: 0.82rem;
+    line-height: 1.6;
+  }
+  .world-dict-overview-item + .world-dict-overview-item {
+    margin-top: 0.65rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid var(--border);
+  }
+  .world-dict-overview-label {
+    display: block;
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    color: var(--gold-dim);
+    margin-bottom: 0.2rem;
+  }
+
+  .world-dict-section-title {
+    font-family: 'Frank Ruhl Libre', serif;
+    font-size: 0.9rem;
+    color: var(--gold-dim);
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+  }
+
+  .world-dict-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .world-dict-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 0.85rem 0.9rem;
+    text-align: right;
+  }
+  .world-dict-card.mystery {
+    border-color: rgba(201,168,76,0.35);
+    background: var(--gold-fill-soft);
+  }
+
+  .world-dict-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    margin-bottom: 0.4rem;
+  }
+  .world-dict-card-title {
+    font-family: 'Frank Ruhl Libre', serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--gold);
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+  }
+  .world-dict-card-body {
+    font-size: 0.84rem;
+    line-height: 1.65;
+    color: var(--text-body);
+    margin: 0;
+  }
+  .world-dict-card-body.rule { font-style: italic; }
+  .world-dict-card-meta {
+    font-size: 0.74rem;
+    color: var(--text-faint);
+    margin: 0.35rem 0 0;
+    line-height: 1.5;
+  }
+
+  .world-dict-pill {
+    display: inline-block;
+    background: var(--meta-bg);
+    border-radius: 999px;
+    padding: 0.08rem 0.5rem;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+  }
+  .world-dict-pill.status { color: var(--gold); }
+
+  .world-dict-empty {
+    font-size: 0.84rem;
+    color: var(--text-faint);
+    line-height: 1.65;
+    font-style: italic;
+    padding: 0.5rem 0;
+  }
+
+  @media (max-width: 520px) {
+    .world-dictionary-drawer {
+      width: 100%;
+      max-height: 88dvh;
+      top: auto;
+      bottom: 0;
+      height: auto;
+      max-height: 88dvh;
+      border-left: none;
+      border-top: 1px solid rgba(201,168,76,0.25);
+      border-radius: 12px 12px 0 0;
+      transform: translateY(100%);
+    }
+    .world-dictionary-drawer.open { transform: translateY(0); }
+    .world-dict-content { max-height: 55dvh; }
+  }
 
   .chapter-heading {
     text-align: center;

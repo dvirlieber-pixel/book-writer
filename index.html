@@ -322,6 +322,8 @@
         <div class="book-tagline" id="book-tagline"></div>
       </div>
 
+      <div id="world-dict-library-slot"></div>
+
       <div class="progress-section">
         <div class="progress-label">
           <span>זמין לקריאה</span>
@@ -364,6 +366,7 @@
     <button class="back-btn" data-action="showLibrary">← חזרה</button>
     <div class="reading-chapter-label" id="reading-chapter-label"></div>
     <div class="reading-toolbar">
+      <button type="button" class="read-tool-btn" data-action="openWorldDictionary" title="מילון העולם">🌍</button>
       <button type="button" class="read-tool-btn" data-action="adjustFontSize" data-arg="-0.08" title="הקטן">A−</button>
       <button type="button" class="read-tool-btn" data-action="adjustFontSize" data-arg="0.08" title="הגדל">A+</button>
       <button type="button" class="read-tool-btn" data-action="toggleTheme" title="מצב בהיר/כהה" id="theme-toggle-btn">☀</button>
@@ -405,6 +408,20 @@
     <button type="button" class="reading-nav-btn" id="nav-next-chapter">פרק הבא ←</button>
   </nav>
 </div>
+
+<div class="world-dict-backdrop" id="world-dict-backdrop" data-action="closeWorldDictionary"></div>
+<aside class="world-dictionary-drawer" id="world-dictionary-drawer" aria-hidden="true" aria-label="מילון העולם">
+  <div class="world-dict-drawer-header">
+    <div>
+      <span class="world-dict-drawer-kicker">🌍</span>
+      <h2 class="world-dict-drawer-title">מילון העולם</h2>
+      <p class="world-dict-drawer-sub" id="world-dict-book-title"></p>
+    </div>
+    <button type="button" class="world-dict-drawer-close" data-action="closeWorldDictionary" aria-label="סגור">✕</button>
+  </div>
+  <nav class="world-dict-tabs" id="world-dict-tabs" role="tablist" aria-label="קטגוריות מילון"></nav>
+  <div class="world-dict-content" id="world-dict-content" role="tabpanel"></div>
+</aside>
 
   <script type="module" src="/src/main.js"></script>
 </body>

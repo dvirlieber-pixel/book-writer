@@ -85,7 +85,10 @@ export function boot(App) {
   }
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') App.closeChapterDrawer();
+    if (e.key === 'Escape') {
+      App.closeWorldDictionary();
+      App.closeChapterDrawer();
+    }
   });
 
   if ('serviceWorker' in navigator) {

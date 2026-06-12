@@ -1,5 +1,6 @@
 const WITH_ELEMENT = new Set(['selectChoice', 'selectReadingLength', 'selectSequelLength']);
 const WITH_NUMERIC_ARG = new Set(['adjustFontSize', 'goToWizardStep']);
+const WITH_STRING_ARG = new Set(['selectWorldDictTab']);
 
 export function bindEvents(App) {
   document.addEventListener('click', (e) => {
@@ -11,6 +12,7 @@ export function bindEvents(App) {
 
     if (WITH_ELEMENT.has(action)) fn(el);
     else if (WITH_NUMERIC_ARG.has(action)) fn(parseFloat(el.dataset.arg, 10));
+    else if (WITH_STRING_ARG.has(action)) fn(el.dataset.arg);
     else if (action === 'setBookRating') fn(parseInt(el.dataset.rating, 10));
     else fn();
   });
