@@ -379,3 +379,59 @@ function mergeContinuation(existing, continuation) {
   }
   return tail + '\n' + head;
 }
+
+/** בדיקה קלילה של מפתח API — countTokens, ללא תור ה-rate limiter */
+async function verifyGeminiApiKey(apiKey) {
+  const key = (apiKey || '').trim();
+  if (!key) return { ok: false, message: 'הזן מפתח לפני הבדיקה.' };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_LITE}:countTokens`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'ok' }] }]
+        })
+      }
+    );
+    clearTimeout(timeoutId);
+
+    if (response.ok) return { ok: true };
+
+    const errBody = await response.json().catch(() => ({}));
+    const apiMsg = errBody?.error?.message || '';
+
+    if (response.status === 400 || response.status === 403 || response.status === 401) {
+      const invalidKey = /api.?key|invalid|permission|denied|unauthorized/i.test(apiMsg);
+      return {
+        ok: false,
+        message: invalidKey
+          ? 'המפתח לא תקין או שאינו מורשה. ודא שהעתקת אותו נכון מ-Google AI Studio.'
+          : (apiMsg || 'המפתח נדחה על ידי השרת. בדוק את ההגדרות בפרויקט שלך.')
+      };
+    }
+
+    if (response.status === 429) {
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      message: apiMsg || `הבדיקה נכשלה (שגיאה ${response.status}). נסה שוב בעוד רגע.`
+    };
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e?.name === 'AbortError') {
+      return { ok: false, message: 'הבדיקה ארכה יותר מדי — בדוק את חיבור האינטרנט.' };
+    }
+    return { ok: false, message: 'לא ניתן להתחבר לשרת Gemini. בדוק את החיבור לרשת.' };
+  }
+}

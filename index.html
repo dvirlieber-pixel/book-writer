@@ -199,6 +199,11 @@
               <input type="password" id="api-key-input" placeholder="AIza..." autocomplete="off" />
               <button type="button" class="api-show-key-btn" data-action="toggleApiKeyVisibility">הצג</button>
             </div>
+            <div class="api-key-verify-row">
+              <button type="button" class="api-verify-btn" id="api-verify-btn" data-action="validateApiKey">בדוק מפתח</button>
+              <div class="api-key-verify-indicator" id="api-key-verify-indicator" aria-live="polite" aria-atomic="true" hidden></div>
+            </div>
+            <div class="api-key-verify-error" id="api-key-verify-error" role="alert" style="display:none"></div>
             <div class="api-key-status" id="api-key-status"></div>
             <div class="model-fallback-notice" id="welcome-model-fallback-notice" style="display:none" role="status"></div>
           </div>

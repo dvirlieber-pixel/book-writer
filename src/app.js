@@ -1491,8 +1491,137 @@ function startRandomBook() {
   startBookCreation();
 }
 
+let apiKeyVerifyCache = { key: '', state: 'idle', message: '' };
+let apiKeyVerifyInFlight = false;
+let apiKeyVerifyAutoKey = '';
+
 function getStoredApiKey() {
   return (document.getElementById('api-key-input')?.value.trim() || store.app.apiKey || store.state.apiKey || '').trim();
+}
+
+function showApiKeyVerifyError(msg) {
+  const el = document.getElementById('api-key-verify-error');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function hideApiKeyVerifyError() {
+  showApiKeyVerifyError('');
+}
+
+function invalidateApiKeyVerification() {
+  const key = getStoredApiKey();
+  if (apiKeyVerifyCache.key && apiKeyVerifyCache.key !== key) {
+    apiKeyVerifyCache = { key: '', state: 'idle', message: '' };
+    updateApiKeyVerifyUI('idle');
+    hideApiKeyVerifyError();
+  }
+}
+
+function updateApiKeyVerifyUI(forcedState) {
+  const indicator = document.getElementById('api-key-verify-indicator');
+  const btn = document.getElementById('api-verify-btn');
+  if (!indicator) return;
+
+  const key = getStoredApiKey();
+  let store.state = forcedState;
+  if (!store.state) {
+    if (apiKeyVerifyInFlight) store.state = 'checking';
+    else if (apiKeyVerifyCache.key === key) store.state = apiKeyVerifyCache.state;
+    else store.state = 'idle';
+  }
+
+  if (store.state === 'idle' || !key) {
+    indicator.hidden = true;
+    indicator.className = 'api-key-verify-indicator';
+    indicator.textContent = '';
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  indicator.hidden = false;
+  indicator.className = `api-key-verify-indicator is-${store.state}`;
+
+  if (store.state === 'checking') {
+    indicator.innerHTML = '<span class="api-verify-spinner" aria-hidden="true"></span><span>בודק מפתח...</span>';
+    if (btn) btn.disabled = true;
+  } else if (store.state === 'valid') {
+    indicator.innerHTML = '<span class="api-verify-icon valid" aria-hidden="true">✓</span><span>מפתח תקין</span>';
+    if (btn) btn.disabled = false;
+  } else if (store.state === 'invalid') {
+    indicator.innerHTML = '<span class="api-verify-icon invalid" aria-hidden="true">✗</span><span>מפתח לא תקין</span>';
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function runApiKeyVerification({ auto = false } = {}) {
+  const key = (document.getElementById('api-key-input')?.value.trim() || '').trim();
+  if (!key) {
+    if (!auto) showApiKeyVerifyError('הזן מפתח לפני הבדיקה.');
+    updateApiKeyVerifyUI('idle');
+    return { ok: false, message: 'הזן מפתח לפני הבדיקה.' };
+  }
+
+  if (apiKeyVerifyCache.key === key && apiKeyVerifyCache.state === 'valid') {
+    updateApiKeyVerifyUI('valid');
+    hideApiKeyVerifyError();
+    return { ok: true };
+  }
+
+  if (apiKeyVerifyInFlight) return { ok: false };
+
+  if (!navigator.onLine) {
+    const msg = 'אין חיבור רשת — לא ניתן לבדוק את המפתח כרגע.';
+    if (!auto) showApiKeyVerifyError(msg);
+    return { ok: false, message: msg };
+  }
+
+  apiKeyVerifyInFlight = true;
+  updateApiKeyVerifyUI('checking');
+  hideApiKeyVerifyError();
+
+  const result = await verifyGeminiApiKey(key);
+  apiKeyVerifyInFlight = false;
+
+  if (result.ok) {
+    store.app.apiKey = key;
+    store.state.apiKey = key;
+    save();
+    apiKeyVerifyCache = { key, state: 'valid', message: '' };
+    updateApiKeyVerifyUI('valid');
+    updateApiKeyStatus();
+    hideApiKeyVerifyError();
+    return { ok: true };
+  }
+
+  apiKeyVerifyCache = { key, state: 'invalid', message: result.message || '' };
+  updateApiKeyVerifyUI('invalid');
+  if (!auto) showApiKeyVerifyError(result.message || 'המפתח לא תקין.');
+  return { ok: false, message: result.message };
+}
+
+function validateApiKey() {
+  runApiKeyVerification({ auto: false });
+}
+
+async function ensureApiKeyVerified() {
+  const key = getStoredApiKey();
+  if (!key) return { ok: false, message: 'נדרש מפתח Gemini אישי.' };
+  if (apiKeyVerifyCache.key === key && apiKeyVerifyCache.state === 'valid') return { ok: true };
+  return runApiKeyVerification({ auto: true });
+}
+
+function maybeAutoVerifyApiKey() {
+  const key = getStoredApiKey();
+  if (!key || key.length < 8) return;
+  if (apiKeyVerifyCache.key === key && apiKeyVerifyCache.state === 'valid') {
+    updateApiKeyVerifyUI('valid');
+    return;
+  }
+  if (apiKeyVerifyAutoKey === key && (apiKeyVerifyInFlight || apiKeyVerifyCache.key === key)) return;
+  apiKeyVerifyAutoKey = key;
+  runApiKeyVerification({ auto: true });
 }
 
 function updateApiKeyStatus() {
@@ -1500,7 +1629,10 @@ function updateApiKeyStatus() {
   if (!el) return;
   const key = getStoredApiKey();
   if (key.length > 8) {
-    el.textContent = '✓ מפתח שמור במכשיר זה (מסתיים ב-…' + key.slice(-4) + ')';
+    const verified = apiKeyVerifyCache.key === key && apiKeyVerifyCache.state === 'valid';
+    el.textContent = verified
+      ? '✓ מפתח שמור ואומת (מסתיים ב-…' + key.slice(-4) + ')'
+      : 'מפתח שמור במכשיר (מסתיים ב-…' + key.slice(-4) + ') — לחץ "בדוק מפתח" לאימות';
     el.className = 'api-key-status saved';
   } else {
     el.textContent = 'טרם הוזן מפתח — נדרש לפני פתיחת ספר';
@@ -1509,6 +1641,7 @@ function updateApiKeyStatus() {
 }
 
 function onApiKeyInput() {
+  invalidateApiKeyVerification();
   updateApiKeyStatus();
 }
 
@@ -1775,6 +1908,7 @@ function syncWelcomeApiKeyField() {
   if (input && key && !input.value.trim()) input.value = key;
   updateApiKeyStatus();
   refreshModelFallbackNotice('welcome-model-fallback-notice');
+  maybeAutoVerifyApiKey();
 }
 
 function updateWelcomeWizardUI() {
@@ -2256,6 +2390,62 @@ function mergeContinuation(existing, continuation) {
   return tail + '\n' + head;
 }
 
+/** בדיקה קלילה של מפתח API — countTokens, ללא תור ה-rate limiter */
+async function verifyGeminiApiKey(apiKey) {
+  const key = (apiKey || '').trim();
+  if (!key) return { ok: false, message: 'הזן מפתח לפני הבדיקה.' };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${cfg.GEMINI_MODEL_LITE}:countTokens`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'ok' }] }]
+        })
+      }
+    );
+    clearTimeout(timeoutId);
+
+    if (response.ok) return { ok: true };
+
+    const errBody = await response.json().catch(() => ({}));
+    const apiMsg = errBody?.error?.message || '';
+
+    if (response.status === 400 || response.status === 403 || response.status === 401) {
+      const invalidKey = /api.?key|invalid|permission|denied|unauthorized/i.test(apiMsg);
+      return {
+        ok: false,
+        message: invalidKey
+          ? 'המפתח לא תקין או שאינו מורשה. ודא שהעתקת אותו נכון מ-Google AI Studio.'
+          : (apiMsg || 'המפתח נדחה על ידי השרת. בדוק את ההגדרות בפרויקט שלך.')
+      };
+    }
+
+    if (response.status === 429) {
+      return { ok: true };
+    }
+
+    return {
+      ok: false,
+      message: apiMsg || `הבדיקה נכשלה (שגיאה ${response.status}). נסה שוב בעוד רגע.`
+    };
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e?.name === 'AbortError') {
+      return { ok: false, message: 'הבדיקה ארכה יותר מדי — בדוק את חיבור האינטרנט.' };
+    }
+    return { ok: false, message: 'לא ניתן להתחבר לשרת Gemini. בדוק את החיבור לרשת.' };
+  }
+}
+
 
 // --- book-create.js ---
 // ===== BOOK CREATION =====
@@ -2269,6 +2459,15 @@ async function startBookCreation() {
   if (!apiKey) {
     setWelcomeWizardStep(3, { focusApi: true });
     showError('welcome-error', 'נדרש מפתח Gemini אישי. הזן מפתח בשלב 3, או קבל מפתח חינמי ב-Google AI Studio.');
+    return;
+  }
+
+  const verified = await ensureApiKeyVerified();
+  if (!verified.ok) {
+    setWelcomeWizardStep(3, { focusApi: true });
+    const msg = verified.message || 'המפתח לא עבר בדיקה. לחץ "בדוק מפתח" או הזן מפתח חדש.';
+    showApiKeyVerifyError(msg);
+    showError('welcome-error', msg);
     return;
   }
 
@@ -3692,6 +3891,14 @@ export {
   updateWelcomeShelfLink,
   startRandomBook,
   getStoredApiKey,
+  showApiKeyVerifyError,
+  hideApiKeyVerifyError,
+  invalidateApiKeyVerification,
+  updateApiKeyVerifyUI,
+  runApiKeyVerification,
+  validateApiKey,
+  ensureApiKeyVerified,
+  maybeAutoVerifyApiKey,
   updateApiKeyStatus,
   onApiKeyInput,
   saveApiKeyFromInput,
@@ -3756,6 +3963,7 @@ export {
   assertChapterTextValid,
   isOutputTruncated,
   mergeContinuation,
+  verifyGeminiApiKey,
   startBookCreation,
   createBookBlueprint,
   createSequelBlueprint,

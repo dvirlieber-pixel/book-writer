@@ -996,6 +996,104 @@
   }
   .api-show-key-btn:hover { border-color: var(--gold); color: var(--gold); }
 
+  .api-key-verify-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-top: 0.65rem;
+    flex-wrap: wrap;
+  }
+
+  .api-verify-btn {
+    background: var(--gold-fill-soft);
+    border: 1px solid var(--border-strong);
+    color: var(--gold);
+    padding: 0.45rem 0.85rem;
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    border-radius: 1px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .api-verify-btn:hover:not(:disabled) {
+    background: var(--gold-fill-mid);
+    border-color: var(--gold);
+  }
+
+  .api-verify-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .api-key-verify-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    min-height: 1.5rem;
+  }
+
+  .api-key-verify-indicator.is-valid { color: var(--success-text); }
+  .api-key-verify-indicator.is-invalid { color: var(--error-text); }
+  .api-key-verify-indicator.is-checking { color: var(--gold-dim); }
+
+  .api-verify-spinner {
+    display: inline-block;
+    width: 0.95rem;
+    height: 0.95rem;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: apiVerifySpin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes apiVerifySpin {
+    to { transform: rotate(360deg); }
+  }
+
+  .api-verify-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .api-verify-icon.valid {
+    background: rgba(143, 188, 143, 0.2);
+    color: var(--success-text);
+    border: 1px solid rgba(143, 188, 143, 0.45);
+  }
+
+  .api-verify-icon.invalid {
+    background: var(--error-bg);
+    color: var(--error-text);
+    border: 1px solid var(--error-border);
+  }
+
+  .api-key-verify-error {
+    margin-top: 0.55rem;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    color: var(--error-text);
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    border-radius: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .api-verify-spinner { animation: none; border-top-color: var(--gold); }
+  }
+
   .library-actions, .book-complete-actions {
     display: flex;
     flex-wrap: wrap;

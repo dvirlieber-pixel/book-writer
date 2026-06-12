@@ -13,6 +13,15 @@ async function startBookCreation() {
     return;
   }
 
+  const verified = await ensureApiKeyVerified();
+  if (!verified.ok) {
+    setWelcomeWizardStep(3, { focusApi: true });
+    const msg = verified.message || 'המפתח לא עבר בדיקה. לחץ "בדוק מפתח" או הזן מפתח חדש.';
+    showApiKeyVerifyError(msg);
+    showError('welcome-error', msg);
+    return;
+  }
+
   const profile = collectWelcomeProfile();
   if (!validateWelcomeSelections(profile)) {
     resetWelcomeWizard(1);

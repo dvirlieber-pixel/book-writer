@@ -53,6 +53,7 @@ function syncWelcomeApiKeyField() {
   if (input && key && !input.value.trim()) input.value = key;
   updateApiKeyStatus();
   refreshModelFallbackNotice('welcome-model-fallback-notice');
+  maybeAutoVerifyApiKey();
 }
 
 function updateWelcomeWizardUI() {
