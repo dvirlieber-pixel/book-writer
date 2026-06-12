@@ -90,6 +90,7 @@ function openChapter(idx) {
 
   state.currentReadingChapter = idx;
   state.lastReadChapter = idx;
+  recordLastReadingSession(state.id, idx);
   save();
 
   applyReadingPrefs();

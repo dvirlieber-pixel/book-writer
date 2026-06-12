@@ -574,6 +574,7 @@ function reportLoadError(e) {
 function ensureMinimalAppShell() {
   if (!store.app.books) store.app.books = {};
   if (!store.app.readingPrefs) store.app.readingPrefs = { fontScale: 1, theme: 'dark', immersive: false };
+  if (store.app.lastReadingSession === undefined) store.app.lastReadingSession = null;
 }
 
 async function flushSave() {
@@ -630,6 +631,10 @@ function migrateFromLegacyV1() {
 function applyLoadedAppData() {
   if (!store.app.books) store.app.books = {};
   if (!store.app.readingPrefs) store.app.readingPrefs = { fontScale: 1, theme: 'dark', immersive: false };
+  if (store.app.lastReadingSession === undefined) store.app.lastReadingSession = null;
+  if (store.app.lastReadingSession?.bookId && !store.app.books[store.app.lastReadingSession.bookId]) {
+    store.app.lastReadingSession = null;
+  }
   if (!store.app.tasteProfiles?.length) store.app.tasteProfiles = cfg.DEFAULT_TASTE_PROFILES.map(p => ({ ...p }));
   migrateBooksInApp();
   const ids = Object.keys(store.app.books);
@@ -1061,10 +1066,12 @@ function renderShelf() {
 
   if (!Object.keys(store.app.books).length) {
     grid.innerHTML = '<div class="shelf-empty">אין ספרים במדף — פתח ספר חדש להתחיל</div>';
+    renderShelfContinueFab();
     return;
   }
   if (!ids.length) {
     grid.innerHTML = '<div class="shelf-empty">אין ספרים בסינון זה — נסה סינון אחר</div>';
+    renderShelfContinueFab();
     return;
   }
   grid.innerHTML = '';
@@ -1102,6 +1109,98 @@ function renderShelf() {
     card.querySelector('[data-delete]').onclick = (e) => deleteBookFromShelf(id, e);
     grid.appendChild(card);
   });
+  renderShelfContinueFab();
+}
+
+function recordLastReadingSession(bookId, chapterIdx) {
+  if (!bookId || chapterIdx == null || chapterIdx < 0) return;
+  store.app.lastReadingSession = {
+    bookId,
+    chapterIdx,
+    updatedAt: Date.now()
+  };
+}
+
+function clearLastReadingSessionIfBook(bookId) {
+  if (store.app.lastReadingSession?.bookId === bookId) {
+    store.app.lastReadingSession = null;
+  }
+}
+
+function getLastReadingSessionTarget() {
+  let bookId = store.app.lastReadingSession?.bookId;
+  let chapterIdx = store.app.lastReadingSession?.chapterIdx;
+
+  if (bookId && !store.app.books[bookId]) {
+    store.app.lastReadingSession = null;
+    save();
+    bookId = null;
+  }
+
+  if (!bookId) {
+    bookId = store.app.currentBookId;
+    if (!bookId || !store.app.books[bookId]) return null;
+    const b = store.app.books[bookId];
+    const written = b.chapters?.length || 0;
+    if (!written) return null;
+    chapterIdx = b.lastReadChapter ?? 0;
+    if (chapterIdx >= written) chapterIdx = written - 1;
+  }
+
+  const book = store.app.books[bookId];
+  if (!book) return null;
+  const written = book.chapters?.length || 0;
+  if (!written) return null;
+
+  if (chapterIdx == null || chapterIdx < 0) chapterIdx = 0;
+  if (chapterIdx >= written) chapterIdx = written - 1;
+
+  const ch = book.chapters[chapterIdx];
+  return {
+    bookId,
+    chapterIdx,
+    chapterNum: ch?.number || chapterIdx + 1,
+    title: book.book?.title || 'ספר ללא שם'
+  };
+}
+
+function renderShelfContinueFab() {
+  const fab = document.getElementById('shelf-continue-fab');
+  const label = document.getElementById('shelf-continue-fab-label');
+  const body = document.querySelector('#shelf-screen .shelf-body');
+  if (!fab || !label) return;
+
+  const onShelf = document.getElementById('shelf-screen')?.classList.contains('active');
+  const target = getLastReadingSessionTarget();
+
+  if (!onShelf || !target) {
+    fab.hidden = true;
+    if (body) body.classList.remove('has-continue-fab');
+    return;
+  }
+
+  const shortTitle = target.title.length > 32 ? target.title.slice(0, 30) + '…' : target.title;
+  label.textContent = `המשך לקרוא: ${shortTitle} — פרק ${target.chapterNum}`;
+  fab.hidden = false;
+  if (body) body.classList.add('has-continue-fab');
+}
+
+function openBookForReading(id, chapterIdx) {
+  if (store.state.book && store.state.id) store.app.books[store.state.id] = bookSnapshot();
+  applyBookSnapshot(store.app.books[id]);
+  store.app.currentBookId = id;
+  store.state.apiKey = store.app.apiKey;
+  save();
+  openChapter(chapterIdx);
+}
+
+function continueReadingFromFab() {
+  const target = getLastReadingSessionTarget();
+  if (!target) {
+    renderShelfContinueFab();
+    return;
+  }
+  openBookForReading(target.bookId, target.chapterIdx);
 }
 
 function escapeHtml(s) {
@@ -1110,10 +1209,9 @@ function escapeHtml(s) {
 
 function continueBookFromShelf(id, ev) {
   if (ev) ev.stopPropagation();
-  openBookFromShelf(id);
   const b = store.app.books[id];
   const idx = getContinueChapterIndex(b);
-  if (idx >= 0) openChapter(idx);
+  if (idx >= 0) openBookForReading(id, idx);
 }
 
 function openBookFromShelf(id) {
@@ -1874,6 +1972,12 @@ function showScreen(id) {
   applyReadingPrefs();
   updateLandscapeToggleButton();
   if (id === 'welcome-screen') updateWelcomeWizardUI();
+  if (id === 'shelf-screen') renderShelfContinueFab();
+  else {
+    const fab = document.getElementById('shelf-continue-fab');
+    if (fab) fab.hidden = true;
+    document.querySelector('#shelf-screen .shelf-body')?.classList.remove('has-continue-fab');
+  }
 }
 
 function showLibrary() {
@@ -3635,6 +3739,7 @@ function openChapter(idx) {
 
   store.state.currentReadingChapter = idx;
   store.state.lastReadChapter = idx;
+  recordLastReadingSession(store.state.id, idx);
   save();
 
   applyReadingPrefs();
@@ -3751,6 +3856,7 @@ function deleteBookFromShelf(id, ev) {
   if (ev) ev.stopPropagation();
   if (!confirm('למחוק את הספר מהמדף?')) return;
   delete store.app.books[id];
+  clearLastReadingSessionIfBook(id);
   if (store.app.currentBookId === id) {
     const ids = Object.keys(store.app.books);
     if (ids.length) {
@@ -3868,6 +3974,12 @@ export {
   getContinueChapterIndex,
   shelfCount,
   renderShelf,
+  recordLastReadingSession,
+  clearLastReadingSessionIfBook,
+  getLastReadingSessionTarget,
+  renderShelfContinueFab,
+  openBookForReading,
+  continueReadingFromFab,
   escapeHtml,
   continueBookFromShelf,
   openBookFromShelf,

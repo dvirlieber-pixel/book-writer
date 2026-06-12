@@ -72,6 +72,7 @@ function reportLoadError(e) {
 function ensureMinimalAppShell() {
   if (!app.books) app.books = {};
   if (!app.readingPrefs) app.readingPrefs = { fontScale: 1, theme: 'dark', immersive: false };
+  if (app.lastReadingSession === undefined) app.lastReadingSession = null;
 }
 
 async function flushSave() {
@@ -128,6 +129,10 @@ function migrateFromLegacyV1() {
 function applyLoadedAppData() {
   if (!app.books) app.books = {};
   if (!app.readingPrefs) app.readingPrefs = { fontScale: 1, theme: 'dark', immersive: false };
+  if (app.lastReadingSession === undefined) app.lastReadingSession = null;
+  if (app.lastReadingSession?.bookId && !app.books[app.lastReadingSession.bookId]) {
+    app.lastReadingSession = null;
+  }
   if (!app.tasteProfiles?.length) app.tasteProfiles = DEFAULT_TASTE_PROFILES.map(p => ({ ...p }));
   migrateBooksInApp();
   const ids = Object.keys(app.books);

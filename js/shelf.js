@@ -48,10 +48,12 @@ function renderShelf() {
 
   if (!Object.keys(app.books).length) {
     grid.innerHTML = '<div class="shelf-empty">אין ספרים במדף — פתח ספר חדש להתחיל</div>';
+    renderShelfContinueFab();
     return;
   }
   if (!ids.length) {
     grid.innerHTML = '<div class="shelf-empty">אין ספרים בסינון זה — נסה סינון אחר</div>';
+    renderShelfContinueFab();
     return;
   }
   grid.innerHTML = '';
@@ -89,6 +91,98 @@ function renderShelf() {
     card.querySelector('[data-delete]').onclick = (e) => deleteBookFromShelf(id, e);
     grid.appendChild(card);
   });
+  renderShelfContinueFab();
+}
+
+function recordLastReadingSession(bookId, chapterIdx) {
+  if (!bookId || chapterIdx == null || chapterIdx < 0) return;
+  app.lastReadingSession = {
+    bookId,
+    chapterIdx,
+    updatedAt: Date.now()
+  };
+}
+
+function clearLastReadingSessionIfBook(bookId) {
+  if (app.lastReadingSession?.bookId === bookId) {
+    app.lastReadingSession = null;
+  }
+}
+
+function getLastReadingSessionTarget() {
+  let bookId = app.lastReadingSession?.bookId;
+  let chapterIdx = app.lastReadingSession?.chapterIdx;
+
+  if (bookId && !app.books[bookId]) {
+    app.lastReadingSession = null;
+    save();
+    bookId = null;
+  }
+
+  if (!bookId) {
+    bookId = app.currentBookId;
+    if (!bookId || !app.books[bookId]) return null;
+    const b = app.books[bookId];
+    const written = b.chapters?.length || 0;
+    if (!written) return null;
+    chapterIdx = b.lastReadChapter ?? 0;
+    if (chapterIdx >= written) chapterIdx = written - 1;
+  }
+
+  const book = app.books[bookId];
+  if (!book) return null;
+  const written = book.chapters?.length || 0;
+  if (!written) return null;
+
+  if (chapterIdx == null || chapterIdx < 0) chapterIdx = 0;
+  if (chapterIdx >= written) chapterIdx = written - 1;
+
+  const ch = book.chapters[chapterIdx];
+  return {
+    bookId,
+    chapterIdx,
+    chapterNum: ch?.number || chapterIdx + 1,
+    title: book.book?.title || 'ספר ללא שם'
+  };
+}
+
+function renderShelfContinueFab() {
+  const fab = document.getElementById('shelf-continue-fab');
+  const label = document.getElementById('shelf-continue-fab-label');
+  const body = document.querySelector('#shelf-screen .shelf-body');
+  if (!fab || !label) return;
+
+  const onShelf = document.getElementById('shelf-screen')?.classList.contains('active');
+  const target = getLastReadingSessionTarget();
+
+  if (!onShelf || !target) {
+    fab.hidden = true;
+    if (body) body.classList.remove('has-continue-fab');
+    return;
+  }
+
+  const shortTitle = target.title.length > 32 ? target.title.slice(0, 30) + '…' : target.title;
+  label.textContent = `המשך לקרוא: ${shortTitle} — פרק ${target.chapterNum}`;
+  fab.hidden = false;
+  if (body) body.classList.add('has-continue-fab');
+}
+
+function openBookForReading(id, chapterIdx) {
+  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+  applyBookSnapshot(app.books[id]);
+  app.currentBookId = id;
+  state.apiKey = app.apiKey;
+  save();
+  openChapter(chapterIdx);
+}
+
+function continueReadingFromFab() {
+  const target = getLastReadingSessionTarget();
+  if (!target) {
+    renderShelfContinueFab();
+    return;
+  }
+  openBookForReading(target.bookId, target.chapterIdx);
 }
 
 function escapeHtml(s) {
@@ -97,10 +191,9 @@ function escapeHtml(s) {
 
 function continueBookFromShelf(id, ev) {
   if (ev) ev.stopPropagation();
-  openBookFromShelf(id);
   const b = app.books[id];
   const idx = getContinueChapterIndex(b);
-  if (idx >= 0) openChapter(idx);
+  if (idx >= 0) openBookForReading(id, idx);
 }
 
 function openBookFromShelf(id) {

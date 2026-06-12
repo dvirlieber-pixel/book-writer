@@ -18,6 +18,7 @@ function deleteBookFromShelf(id, ev) {
   if (ev) ev.stopPropagation();
   if (!confirm('למחוק את הספר מהמדף?')) return;
   delete app.books[id];
+  clearLastReadingSessionIfBook(id);
   if (app.currentBookId === id) {
     const ids = Object.keys(app.books);
     if (ids.length) {

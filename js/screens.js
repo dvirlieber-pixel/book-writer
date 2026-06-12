@@ -19,6 +19,12 @@ function showScreen(id) {
   applyReadingPrefs();
   updateLandscapeToggleButton();
   if (id === 'welcome-screen') updateWelcomeWizardUI();
+  if (id === 'shelf-screen') renderShelfContinueFab();
+  else {
+    const fab = document.getElementById('shelf-continue-fab');
+    if (fab) fab.hidden = true;
+    document.querySelector('#shelf-screen .shelf-body')?.classList.remove('has-continue-fab');
+  }
 }
 
 function showLibrary() {

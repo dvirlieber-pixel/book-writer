@@ -9,7 +9,8 @@ export const store = {
     apiKey: '',
     currentBookId: null,
     books: {},
-    readingPrefs: { fontScale: 1, theme: 'dark', immersive: false }
+    readingPrefs: { fontScale: 1, theme: 'dark', immersive: false },
+    lastReadingSession: null
   },
   state: bookModel.createEmptyBookState(),
   pendingSequelSourceId: null,

@@ -4,7 +4,7 @@ let saveTimer = null;
 let welcomeDraft = defaultBookProfile();
 let readingLengthKey = 'short';
 
-let app = { apiKey: '', currentBookId: null, books: {}, readingPrefs: { fontScale: 1, theme: 'dark', immersive: false } };
+let app = { apiKey: '', currentBookId: null, books: {}, readingPrefs: { fontScale: 1, theme: 'dark', immersive: false }, lastReadingSession: null };
 let state = createEmptyBookState();
 let pendingSequelSourceId = null;
 let pendingSequelLengthKey = 'short';
