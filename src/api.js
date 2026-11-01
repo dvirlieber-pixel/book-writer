@@ -368,9 +368,11 @@ export function isOutputTruncated(text, finishReason, minWords) {
   if (finishReason === 'MAX_TOKENS' || finishReason === 'LENGTH') return true;
   if (countWords(text) < minWords) return true;
   if (!endsWithCompleteSentence(text)) return true;
-  // בדיקה נוספת: אם הטקסט נגמר באמצע דיאלוג פתוח
+  // בדיקה נוספת: אם הטקסט נגמר באמצע דיאלוג פתוח.
+  // מרכאות בין שתי אותיות עבריות הן קיצור (ד"ר, צה"ל, עו"ד) ולא פתיחת דיאלוג.
   const trimmed = text.trimEnd();
-  if (trimmed.endsWith('"') === false && (trimmed.match(/"/g) || []).length % 2 !== 0) return true;
+  const dialogueQuotes = trimmed.replace(/[א-ת]"(?=[א-ת])/g, '').match(/"/g) || [];
+  if (trimmed.endsWith('"') === false && dialogueQuotes.length % 2 !== 0) return true;
   return false;
 }
 

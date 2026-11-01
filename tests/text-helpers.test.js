@@ -53,6 +53,13 @@ describe('isOutputTruncated', () => {
   it('accepts complete text', () => {
     expect(App.isOutputTruncated(full, 'STOP', 10)).toBe(false);
   });
+
+  it('does not treat Hebrew abbreviations as an open quote', () => {
+    expect(App.isOutputTruncated(words(20) + ' הוא פנה אל ד"ר כהן.', 'STOP', 10)).toBe(false);
+    expect(App.isOutputTruncated(words(20) + ' צה"ל, עו"ד ו-ש"ח.', 'STOP', 10)).toBe(false);
+    // An abbreviation inside a still-open line of dialogue is still caught
+    expect(App.isOutputTruncated(words(20) + ' "ד"ר כהן הגיע. ' + words(5) + '.', 'STOP', 10)).toBe(true);
+  });
 });
 
 describe('titles', () => {
@@ -128,19 +135,73 @@ describe('chapter analysis', () => {
     expect(cut).toContain('[...]');
   });
 
-  it('parseChapterAnalysis returns summary bullets and the memory book', () => {
-    const raw = JSON.stringify({ summary: ['נועה מצאה את המפה', '- השער נפתח'], memoryBook: { characters: [{ name: 'נועה' }] } });
-    const r = App.parseChapterAnalysis(raw, 'טקסט', 4);
+  it('parseChapterAnalysis returns summary bullets and the merged memory book', () => {
+    const raw = JSON.stringify({ summary: ['נועה מצאה את המפה', '- השער נפתח'], memoryUpdates: { characters: [{ name: 'נועה', status: 'בשער' }] } });
+    const r = App.parseChapterAnalysis(raw, 'טקסט', 4, { characters: [{ name: 'נועה', role: 'גיבורה', status: 'בדרך' }] });
     expect(r.summary).toBe('- נועה מצאה את המפה\n- השער נפתח');
-    expect(r.memoryBook.characters).toEqual([{ name: 'נועה' }]);
+    expect(r.memoryBook.characters).toEqual([{ name: 'נועה', role: 'גיבורה', status: 'בשער' }]);
     expect(r.memoryBook.openMysteries).toEqual([]);
   });
 
   it('parseChapterAnalysis falls back per field', () => {
-    const noMemory = App.parseChapterAnalysis('{"summary":"רק סיכום"}', 'טקסט', 4);
+    const noMemory = App.parseChapterAnalysis('{"summary":"רק סיכום"}', 'טקסט', 4, {});
     expect(noMemory).toEqual({ memoryBook: null, summary: '- רק סיכום' });
-    const broken = App.parseChapterAnalysis('לא JSON', 'תחילת הפרק', 4);
+    const broken = App.parseChapterAnalysis('לא JSON', 'תחילת הפרק', 4, {});
     expect(broken.memoryBook).toBeNull();
     expect(broken.summary).toBe('פרק 4: תחילת הפרק...');
+  });
+});
+
+describe('mergeMemoryUpdates', () => {
+  const current = {
+    characters: [{ name: 'נועה', role: 'גיבורה', status: 'בדרך', notes: 'יודעת לקרוא מפות' }, { name: 'אבי', role: 'מורה', status: 'חי', notes: '' }],
+    locations: [{ name: 'העמק', description: 'ירוק', significance: 'בית' }],
+    keyObjects: [],
+    worldRules: [{ rule: 'אין קסם בלילה', establishedInChapter: 1, notes: '' }],
+    openMysteries: [{ question: 'מי פתח את השער?', introducedChapter: 2, status: 'פתוח', clues: 'עקבות' }]
+  };
+
+  it('patches existing entries without losing untouched fields or entries', () => {
+    const m = App.mergeMemoryUpdates(current, { characters: [{ name: 'נועה', status: 'פצועה', notes: '' }] }, 5);
+    expect(m.characters[0]).toEqual({ name: 'נועה', role: 'גיבורה', status: 'פצועה', notes: 'יודעת לקרוא מפות' });
+    expect(m.characters[1]).toEqual(current.characters[1]);
+    expect(m.locations).toEqual(current.locations);
+    expect(m.worldRules).toEqual(current.worldRules);
+  });
+
+  it('matches keys ignoring case and extra spaces, and resolves mysteries', () => {
+    const m = App.mergeMemoryUpdates(current, { openMysteries: [{ question: '  מי  פתח את השער? ', status: 'נפתר' }] }, 6);
+    expect(m.openMysteries).toHaveLength(1);
+    expect(m.openMysteries[0]).toMatchObject({ status: 'נפתר', clues: 'עקבות', introducedChapter: 2 });
+  });
+
+  it('adds new entries and stamps the chapter where relevant', () => {
+    const m = App.mergeMemoryUpdates(current, {
+      keyObjects: [{ name: 'מפתח', description: 'ברזל', owner: 'נועה', status: '' }],
+      worldRules: [{ rule: 'השער נפתח רק בירח מלא' }]
+    }, 7);
+    expect(m.keyObjects).toEqual([{ name: 'מפתח', description: 'ברזל', owner: 'נועה' }]);
+    expect(m.worldRules[1]).toEqual({ rule: 'השער נפתח רק בירח מלא', establishedInChapter: 7 });
+  });
+
+  it('does not mutate the current memory book', () => {
+    const before = JSON.stringify(current);
+    App.mergeMemoryUpdates(current, { characters: [{ name: 'נועה', status: 'x' }, { name: 'חדש' }] }, 8);
+    expect(JSON.stringify(current)).toBe(before);
+  });
+
+  it('returns null when there is nothing usable', () => {
+    expect(App.mergeMemoryUpdates(current, undefined, 1)).toBeNull();
+    expect(App.mergeMemoryUpdates(current, { characters: [] }, 1)).toBeNull();
+    expect(App.mergeMemoryUpdates(current, { characters: [{ role: 'בלי שם' }] }, 1)).toBeNull();
+  });
+
+  it('keeps every entry as the book grows', () => {
+    let mb = App.emptyMemoryBook();
+    for (let ch = 1; ch <= 60; ch++) {
+      mb = App.mergeMemoryUpdates(mb, { characters: [{ name: `דמות ${ch}`, status: 'חיה' }, { name: 'דמות 1', status: `פרק ${ch}` }] }, ch);
+    }
+    expect(mb.characters).toHaveLength(60);
+    expect(mb.characters[0].status).toBe('פרק 60');
   });
 });

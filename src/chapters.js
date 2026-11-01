@@ -551,10 +551,55 @@ export function chapterTextForAnalysis(chapterText, maxChars = 14000) {
   return `${chapterText.slice(0, head)}\n\n[...]\n\n${chapterText.slice(-(maxChars - head))}`;
 }
 
+// Memory book entries are matched by these fields when merging updates
+const MEMORY_KEYS = {
+  characters: 'name',
+  locations: 'name',
+  keyObjects: 'name',
+  worldRules: 'rule',
+  openMysteries: 'question'
+};
+const MEMORY_CHAPTER_FIELDS = { worldRules: 'establishedInChapter', openMysteries: 'introducedChapter' };
+
+const memoryKey = v => String(v ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+/**
+ * Applies the model's per-chapter updates to the memory book without ever dropping an
+ * entry: known keys are patched with the non-empty fields given, unknown keys are added.
+ * Returns a new memory book (input is not mutated), or null when there is nothing usable.
+ */
+export function mergeMemoryUpdates(current, updates, chapterNum) {
+  if (!updates || typeof updates !== 'object') return null;
+  const merged = migrateMemoryBook(current);
+  let touched = false;
+
+  for (const [list, keyField] of Object.entries(MEMORY_KEYS)) {
+    const items = Array.isArray(updates[list]) ? updates[list] : [];
+    if (!items.length) continue;
+    const entries = merged[list].map(e => ({ ...e }));
+    for (const item of items) {
+      if (!item || typeof item !== 'object' || !memoryKey(item[keyField])) continue;
+      const patch = Object.fromEntries(
+        Object.entries(item).filter(([, v]) => v !== '' && v !== null && v !== undefined)
+      );
+      const existing = entries.find(e => memoryKey(e[keyField]) === memoryKey(item[keyField]));
+      if (existing) {
+        Object.assign(existing, patch);
+      } else {
+        const chapterField = MEMORY_CHAPTER_FIELDS[list];
+        entries.push(chapterField && !patch[chapterField] ? { ...patch, [chapterField]: chapterNum } : patch);
+      }
+      touched = true;
+    }
+    merged[list] = entries;
+  }
+  return touched ? merged : null;
+}
+
 /** Shape the analysis response; falls back per field so one bad field doesn't lose the other */
-export function parseChapterAnalysis(raw, chapterText, chapterNum) {
+export function parseChapterAnalysis(raw, chapterText, chapterNum, currentMemory) {
   const data = parseJsonFromResponse(raw || '') || {};
-  const memoryBook = data.memoryBook?.characters ? migrateMemoryBook(data.memoryBook) : null;
+  const memoryBook = mergeMemoryUpdates(currentMemory, data.memoryUpdates, chapterNum);
   const lines = Array.isArray(data.summary) ? data.summary : [data.summary];
   const summary = lines
     .map(l => String(l ?? '').trim())
@@ -568,18 +613,25 @@ export function parseChapterAnalysis(raw, chapterText, chapterNum) {
 }
 
 /**
- * One Lite call after each chapter: updates the memory book and writes the event-log
- * summary from the full chapter text (previously two calls that only saw its opening).
+ * One Lite call after each chapter: writes the event-log summary and lists only the memory
+ * book entries this chapter added or changed, which mergeMemoryUpdates applies. The reply
+ * stays small however large the memory book grows (a full rewrite could hit the output
+ * limit and silently stop updating it).
  * Returns { memoryBook (or null), summary }; the caller commits both to store.state.
  */
 export async function analyzeChapter(chapterText, chapterNum, outline) {
   ensureMemoryBook();
-  const current = JSON.stringify(store.state.memoryBook, null, 2);
+  const currentMemory = store.state.memoryBook;
+  const current = JSON.stringify(currentMemory, null, 2);
 
   const prompt = `קרא את הפרק החדש ובצע שתי משימות. החזר JSON בלבד.
 
 1. summary — 4-6 נקודות קצרות בעברית: אירועים מרכזיים, החלטות חשובות של דמויות, שינויים במצב העולם, וכל מידע חיוני להמשך. רק עובדות, ללא הקדמה.
-2. memoryBook — ספר הזיכרון המעודכן: עדכן קיימים, הוסף חדשים, סמן תעלומות שנפתרו, אל תמחק עובדות חשובות מפרקים קודמים.
+2. memoryUpdates — רק מה שהפרק הזה הוסיף או שינה בספר הזיכרון:
+   - רשומה חדשה: כל השדות.
+   - רשומה קיימת שהשתנתה: אותו מפתח בדיוק כמו בספר הזיכרון (name / rule / question) ורק השדות שהשתנו.
+   - תעלומה שנפתרה: אותה question עם "status": "נפתר".
+   - רשומה שלא השתנתה — אל תכלול. אין צורך למחוק דבר.
 
 ספר זיכרון נוכחי:
 ${current}
@@ -587,24 +639,24 @@ ${current}
 פרק ${chapterNum} — ${outline.title}:
 ${chapterTextForAnalysis(chapterText)}
 
-מבנה התשובה:
+מבנה התשובה (רשימות ריקות כשאין שינוי):
 {
   "summary": ["אירוע", "אירוע"],
-  "memoryBook": {
+  "memoryUpdates": {
     "characters": [{"name":"","role":"","status":"","notes":""}],
     "locations": [{"name":"","description":"","significance":""}],
     "keyObjects": [{"name":"","description":"","owner":"","status":""}],
-    "worldRules": [{"rule":"","establishedInChapter":0,"notes":""}],
-    "openMysteries": [{"question":"","introducedChapter":0,"status":"פתוח|נפתר|בתהליך","clues":""}]
+    "worldRules": [{"rule":"","establishedInChapter":${chapterNum},"notes":""}],
+    "openMysteries": [{"question":"","introducedChapter":${chapterNum},"status":"פתוח|נפתר|בתהליך","clues":""}]
   }
 }`;
 
   try {
-    const { text } = await callGeminiLiteRaw(prompt, '', 5000, { jsonMode: true });
-    return parseChapterAnalysis(text, chapterText, chapterNum);
+    const { text } = await callGeminiLiteRaw(prompt, '', 4000, { jsonMode: true });
+    return parseChapterAnalysis(text, chapterText, chapterNum, currentMemory);
   } catch (e) {
     console.warn('analyzeChapter failed:', e);
-    return parseChapterAnalysis('', chapterText, chapterNum);
+    return parseChapterAnalysis('', chapterText, chapterNum, currentMemory);
   }
 }
 
