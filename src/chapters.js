@@ -4,6 +4,7 @@ import { store } from './store.js';
 import {
   assertChapterTextValid,
   callGeminiLiteRaw,
+  callGeminiProseJson,
   callGeminiRaw,
   countWords,
   endsWithCompleteSentence,
@@ -207,11 +208,36 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
 
     // The reader is already reading this text: a full rewrite would pull it out from under
     // them, so the review (whose only remedy is that rewrite) runs only when nobody watches.
-    const readerWatching = isLiveChapterShown(idx);
-    setLiveChapterStatus(idx, 'הפרק נכתב ✦ מעדכן את ספר הזיכרון...');
+    let revisedPassages = [];
+    let review;
     setPreparingStatus(`מוודא שהפרק ${chapterNum} מוכן...`, useLoadingScreen);
-    let review = readerWatching ? { approved: true, issues: [] } : await reviewChapter(text, idx, plan);
-    assertSameBook();
+    if (isLiveChapterShown(idx)) {
+      // The reader is already reading this text: a rewrite would pull it out from under them,
+      // so problems are fixed by small in-place edits. A failure here never costs the chapter.
+      setLiveChapterStatus(idx, 'הפרק נכתב ✦ בודק עקביות...');
+      try {
+        const liveReview = await reviewChapter(text, idx, plan);
+        assertSameBook();
+        if (!liveReview.approved && liveReview.issues.length) {
+          setLiveChapterStatus(idx, 'מלטש כמה משפטים...');
+          const polished = await polishChapterInPlace(text, liveReview, idx, plan);
+          assertSameBook();
+          if (polished.applied.length) {
+            text = polished.text;
+            validatedText = text;
+            revisedPassages = polished.applied.map(e => e.replace);
+          }
+        }
+      } catch (e) {
+        if (e?.bookSwitched) throw e;
+        console.warn('live chapter review skipped', e);
+      }
+      review = { approved: true, issues: [] };
+    } else {
+      review = await reviewChapter(text, idx, plan);
+      assertSameBook();
+    }
+    setLiveChapterStatus(idx, 'מעדכן את ספר הזיכרון...');
     let fixAttempts = 0;
     while (!review.approved && fixAttempts < cfg.MAX_CHAPTER_FIXES) {
       setPreparingStatus(`מלטש את פרק ${chapterNum}...`, useLoadingScreen);
@@ -254,7 +280,9 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     if (!background) setWriteUiActive(false);
     renderLibrary();
 
-    if (openAfter && (!liveStarted || isLiveChapterShown(idx))) openChapter(idx, { keepScroll: liveStarted });
+    if (openAfter && (!liveStarted || isLiveChapterShown(idx))) {
+      openChapter(idx, { keepScroll: liveStarted, revisedPassages });
+    }
     else if (isReadingScreenActive()) refreshReadingEndActions();
 
     notifyReadingChapterPipeline(idx, false);
@@ -572,6 +600,71 @@ ${chapterBody}`;
     return text;
   }
   return fixed;
+}
+
+const MAX_CHAPTER_EDITS = 8;
+
+/**
+ * Applies find/replace edits that match the text exactly once, each within one paragraph and
+ * of similar length. Edits that don't qualify are skipped, so a bad quote never garbles prose.
+ */
+export function applyChapterEdits(text, edits) {
+  let result = text;
+  const applied = [];
+  for (const edit of (Array.isArray(edits) ? edits : []).slice(0, MAX_CHAPTER_EDITS)) {
+    const find = typeof edit?.find === 'string' ? edit.find.trim() : '';
+    const replace = typeof edit?.replace === 'string' ? edit.replace.trim() : '';
+    if (find.length < 8 || !replace || find === replace) continue;
+    if (/\n/.test(find) || /\n/.test(replace) || replace.length > find.length * 2 + 40) continue;
+    const at = result.indexOf(find);
+    if (at < 0 || result.indexOf(find, at + 1) >= 0) continue;
+    result = result.slice(0, at) + replace + result.slice(at + find.length);
+    applied.push({ find, replace });
+  }
+  return { text: result, applied };
+}
+
+/**
+ * The fix for a chapter the reader is already reading: small quoted corrections instead of a
+ * rewrite, so the text they are in stays put. One prose request, a short reply.
+ */
+export async function polishChapterInPlace(text, review, idx, plan) {
+  const outline = store.state.book.chapterOutlines[idx];
+  const issuesList = (review.issues || [])
+    .map((i, n) => `${n + 1}. [${i.type}/${i.severity}] ${i.description}`)
+    .join('\n');
+  const prompt = `בבדיקת הפרק נמצאו הבעיות שלמטה. הקורא כבר קורא את הפרק, לכן אל תכתוב אותו מחדש:
+תקן רק את המקומות הנחוצים, בתיקונים נקודתיים קטנים. החזר JSON בלבד:
+{"edits": [{"find": "ציטוט מדויק מהפרק", "replace": "הנוסח המתוקן", "issue": 1}]}
+
+כללים:
+- find מועתק אות באות מהפרק — משפט אחד או חלק ממשפט, בתוך פסקה אחת, וייחודי בפרק.
+- replace באורך דומה ל-find. שמור על הסגנון, הקול והפיסוק של הפרק.
+- לכל היותר ${MAX_CHAPTER_EDITS} תיקונים. בעיה שאין לה תיקון נקודתי — דלג עליה.
+- אל תשנה דבר שאינו קשור לבעיות. אין מה לתקן — {"edits": []}.
+
+**בעיות:**
+${issuesList}
+
+**פרק ${outline.number} — ${outline.title}. תכנון:**
+${JSON.stringify(plan)}
+
+${formatMemoryBookForPrompt()}
+
+**הפרק:**
+${text}`;
+
+  const { text: raw } = await callGeminiProseJson(prompt, 4096, {
+    temperature: 0.4,
+    thinkingBudget: cfg.PROSE_THINKING_BUDGET
+  });
+  const edited = applyChapterEdits(text, parseJsonFromResponse(raw || '')?.edits);
+  if (!edited.applied.length) return { text, applied: [] };
+  // Edits are meant to be small: anything that breaks the chapter is dropped as a whole
+  if (!isChapterTextValid(edited.text) || countWords(edited.text) < countWords(text) * 0.9) {
+    return { text, applied: [] };
+  }
+  return edited;
 }
 
 /** Chapter text for analysis prompts: whole chapter, or start + end when very long */

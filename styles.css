@@ -2276,7 +2276,20 @@
     from { background-position: 100% 0; }
     to { background-position: -100% 0; }
   }
+  .chapter-content mark.revised-passage {
+    color: inherit;
+    background: transparent;
+    border-radius: 2px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    animation: revisedGlow 5s ease-out;
+  }
+  @keyframes revisedGlow {
+    0%, 35% { background: rgba(201,168,76,0.3); }
+    100% { background: transparent; }
+  }
   @media (prefers-reduced-motion: reduce) {
+    .chapter-content mark.revised-passage { animation-duration: 0.01s; animation-delay: 4s; background: rgba(201,168,76,0.3); animation-fill-mode: forwards; }
     .chapter-content .live-new,
     .live-caret,
     .live-quill,

@@ -298,12 +298,49 @@ export function stopLiveChapter() {
   document.getElementById('nav-next-chapter')?.classList.remove('live-progress');
 }
 
+/** The first paragraph still on screen and where it sits — survives text changes above it */
+function readingAnchor() {
+  const blocks = document.querySelectorAll('#reading-chapter-content > *');
+  for (let i = 0; i < blocks.length; i++) {
+    const { top, bottom } = blocks[i].getBoundingClientRect();
+    if (bottom > 0) return { index: i, top };
+  }
+  return null;
+}
+
+function restoreReadingAnchor(anchor) {
+  const block = document.querySelectorAll('#reading-chapter-content > *')[anchor.index];
+  if (block) window.scrollBy(0, block.getBoundingClientRect().top - anchor.top);
+}
+
+/** Glows the passages a live polish changed, so a sentence that shifts under the reader says why */
+function markRevisedPassages(contentEl, passages) {
+  passages.forEach(passage => {
+    for (const p of contentEl.querySelectorAll('p')) {
+      const node = [...p.childNodes].find(n => n.nodeType === Node.TEXT_NODE && n.nodeValue.includes(passage));
+      if (!node) continue;
+      const target = node.splitText(node.nodeValue.indexOf(passage));
+      target.splitText(passage.length);
+      const mark = document.createElement('mark');
+      mark.className = 'revised-passage';
+      mark.title = 'תוקן אחרי בדיקת עקביות';
+      target.replaceWith(mark);
+      mark.appendChild(target);
+      return;
+    }
+  });
+}
+
 // ===== OPEN CHAPTER =====
-/** `keepScroll`: the chapter is already on screen (written live) — stay where the reader is */
-export function openChapter(idx, { keepScroll = false } = {}) {
+/**
+ * `keepScroll`: the chapter is already on screen (written live) — keep the reader on the
+ * paragraph they are in. `revisedPassages`: text a live polish changed, highlighted briefly.
+ */
+export function openChapter(idx, { keepScroll = false, revisedPassages = [] } = {}) {
   const chapter = store.state.chapters[idx];
   if (!chapter) return;
   const keptScrollY = window.scrollY;
+  const anchor = keepScroll ? readingAnchor() : null;
   stopLiveChapter();
 
   // A saved scroll position belongs to the chapter it was saved in
@@ -331,6 +368,7 @@ export function openChapter(idx, { keepScroll = false } = {}) {
     .join('');
 
   contentEl.innerHTML = paragraphs;
+  if (revisedPassages.length) markRevisedPassages(contentEl, revisedPassages);
 
   // End actions
   const endEl = document.getElementById('chapter-end-actions');
@@ -372,9 +410,9 @@ export function openChapter(idx, { keepScroll = false } = {}) {
   renderReadingNav(idx);
   showScreen('reading-screen');
   updateLandscapeToggleButton();
-  const scrollY = keepScroll ? keptScrollY : resumeScroll;
-  store.state.lastReadScroll = scrollY;
-  window.scrollTo(0, scrollY);
+  window.scrollTo(0, keepScroll ? keptScrollY : resumeScroll);
+  if (anchor) restoreReadingAnchor(anchor);
+  store.state.lastReadScroll = window.scrollY;
 
   let scrollSaveTimer;
   const onScroll = () => {
