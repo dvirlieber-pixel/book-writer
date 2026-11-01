@@ -11,6 +11,10 @@ export const GEMINI_FETCH_TIMEOUT_MS = 120000;
 /** A long chapter takes longer to generate: the timeout grows with the output budget */
 export const GEMINI_TIMEOUT_MS_PER_TOKEN = 12;
 /** Free-tier prose-model requests per day — an estimate; the API reports no usage until it refuses */
+/** A streamed reply that goes quiet this long is treated as stalled */
+export const GEMINI_STREAM_IDLE_TIMEOUT_MS = 60000;
+/** A stream cut off after this many words is kept and continued instead of written again */
+export const STREAM_KEEP_PARTIAL_MIN_WORDS = 150;
 export const GEMINI_PROSE_DAILY_LIMIT = 20;
 /** Typical prose requests per chapter (the write plus a continuation or a fix) */
 export const PROSE_CALLS_PER_CHAPTER = 2;

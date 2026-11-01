@@ -39,7 +39,7 @@ npm test         # בדיקות (vitest)
 | `chapters.js` | צינור כתיבת פרק: תכנון, סצנות, ביקורת, זיכרון |
 | `book.js` | פרופיל ספר, ניקוי נתונים, snapshot, ייצוא HTML/EPUB |
 | `storage.js` | IndexedDB / localStorage ומיגרציות |
-| `shelf.js` / `library.js` / `reading.js` / `screens.js` | מסכי המדף, הספר, הקריאה והאשף |
+| `shelf.js` / `library.js` / `reading.js` / `screens.js` | מסכי המדף, הספר, הקריאה (כולל פרק שנכתב בשידור חי) והאשף |
 | `world-dictionary.js` | מילון העולם |
 | `prefs-export.js` | העדפות קריאה, PWA, גיבוי JSON |
 | `quota.js` | הערכת המכסה היומית של Gemini (לפי יום Pacific) והתצוגה שלה |

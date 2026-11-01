@@ -9,7 +9,8 @@ import {
   sanitizeChapterTitle
 } from './book.js';
 import {
-  continueFromChapter
+  continueFromChapter,
+  generateChapterAt
 } from './chapters.js';
 import {
   showReadingPreparing
@@ -29,6 +30,7 @@ import {
 import {
   save
 } from './storage.js';
+import { countWords } from './api.js';
 import { escapeHtml } from './utils.js';
 
 // ===== READING NAV =====
@@ -115,11 +117,197 @@ export function renderReadingNav(idx) {
   renderChapterDrawerList(idx);
 }
 
+function isDividerLine(p) {
+  return p === '[***]' || p === '***' || p === '* * *';
+}
+
+function chapterParagraphs(text) {
+  return text.split(/\n+/).map(p => p.trim()).filter(p => p.length > 0);
+}
+
+function fillChapterHeading(idx, title) {
+  const number = idx + 1;
+  document.getElementById('reading-chapter-label').textContent = `פרק ${number} מתוך ${store.state.totalChapters}`;
+  document.getElementById('reading-chapter-num').textContent = `פרק ${number}`;
+  document.getElementById('reading-chapter-title').textContent = sanitizeChapterTitle(title, number);
+  const outline = store.state.book?.chapterOutlines?.[idx];
+  document.getElementById('reading-chapter-epigraph').textContent =
+    outline?.pov ? `נקודת מבט: ${outline.pov}` : '';
+}
+
+// ===== LIVE CHAPTER (streamed while it is written) =====
+// The text arrives in bursts; it is revealed at an even pace a few characters a frame,
+// faster when far behind, so it reads as being written rather than jumping in blocks.
+const live = {
+  idx: null,
+  target: '',
+  shown: 0,
+  frame: 0,
+  done: false,
+  nodes: [],
+  caret: null
+};
+
+export function isLiveChapterShown(idx) {
+  return live.idx === idx && !!document.getElementById('reading-screen')?.classList.contains('active');
+}
+
+export function showLiveChapter(idx) {
+  stopLiveChapter();
+  live.idx = idx;
+  window.removeEventListener('scroll', openChapter._scrollHandler);
+  closeChapterDrawer();
+  showReadingPreparing(false);
+
+  const outline = store.state.book?.chapterOutlines?.[idx];
+  fillChapterHeading(idx, outline?.title || '');
+  const contentEl = document.getElementById('reading-chapter-content');
+  contentEl.innerHTML = '';
+  contentEl.classList.add('live-writing');
+  live.caret = document.createElement('span');
+  live.caret.className = 'live-caret';
+  live.caret.setAttribute('aria-hidden', 'true');
+
+  document.getElementById('chapter-end-actions').innerHTML = `
+    <div class="live-status" role="status">
+      <span class="live-quill" aria-hidden="true">✒</span>
+      <span class="live-status-text">הפרק נכתב עכשיו — אפשר כבר לקרוא</span>
+    </div>`;
+
+  const prevBtn = document.getElementById('nav-prev-chapter');
+  const nextBtn = document.getElementById('nav-next-chapter');
+  const listBtn = document.getElementById('nav-chapter-list');
+  if (prevBtn) {
+    prevBtn.disabled = idx <= 0;
+    prevBtn.onclick = () => { if (idx > 0) openChapter(idx - 1); };
+  }
+  if (listBtn) listBtn.onclick = () => openChapterDrawer(idx - 1);
+  if (nextBtn) {
+    nextBtn.disabled = true;
+    nextBtn.onclick = null;
+    nextBtn.classList.add('live-progress');
+    nextBtn.textContent = '✒ נכתב...';
+  }
+
+  showScreen('reading-screen');
+  updateLandscapeToggleButton();
+}
+
+export function updateLiveChapter(idx, text) {
+  if (live.idx !== idx) return;
+  // The writer restarted or trimmed a half sentence: reveal again from the shared start
+  let common = 0;
+  const max = Math.min(live.shown, text.length);
+  while (common < max && text.charCodeAt(common) === live.target.charCodeAt(common)) common++;
+  live.shown = common;
+  live.target = text;
+  const nextBtn = document.getElementById('nav-next-chapter');
+  if (nextBtn) nextBtn.textContent = `✒ נכתב · ${countWords(text).toLocaleString('he-IL')} מילים`;
+  if (!live.frame) live.frame = requestAnimationFrame(revealLiveText);
+}
+
+function revealLiveText() {
+  live.frame = 0;
+  if (live.idx == null) return;
+  const backlog = live.target.length - live.shown;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) live.shown = live.target.length;
+  else if (backlog > 0) live.shown += Math.max(2, Math.ceil(backlog * 0.06));
+  renderLiveParagraphs(live.target.slice(0, live.shown));
+  if (live.shown < live.target.length) live.frame = requestAnimationFrame(revealLiveText);
+  else if (live.done) live.caret?.remove();
+}
+
+function renderLiveParagraphs(visible) {
+  const contentEl = document.getElementById('reading-chapter-content');
+  const paras = chapterParagraphs(visible);
+  // A divider still arriving ("[**") is not shown until it is complete
+  const lastPara = paras[paras.length - 1];
+  if (lastPara && /^\[?[*\s]*\]?$/.test(lastPara) && !isDividerLine(lastPara)) paras.pop();
+
+  paras.forEach((p, i) => {
+    const kind = isDividerLine(p) ? 'divider' : 'p';
+    const node = live.nodes[i];
+    if (node && node.kind === kind && node.text === p) return;
+    if (node && kind === 'p' && node.kind === 'p') {
+      node.el.firstChild.nodeValue = p;
+      node.text = p;
+      return;
+    }
+    live.nodes.splice(i).forEach(n => n.el.remove());
+    const el = document.createElement(kind === 'divider' ? 'div' : 'p');
+    if (kind === 'divider') {
+      el.className = 'chapter-divider live-new';
+      el.textContent = '✦ ✦ ✦';
+    } else {
+      el.className = 'live-new';
+      el.appendChild(document.createTextNode(p));
+    }
+    contentEl.appendChild(el);
+    live.nodes.push({ kind, text: p, el });
+  });
+  live.nodes.splice(paras.length).forEach(n => n.el.remove());
+  const last = live.nodes[live.nodes.length - 1];
+  if (last?.kind === 'p' && live.caret && live.caret.parentNode !== last.el) last.el.appendChild(live.caret);
+}
+
+/** Writing is over; the chapter is being filed (memory, summary) */
+export function setLiveChapterStatus(idx, message) {
+  if (live.idx !== idx) return;
+  live.done = true;
+  if (live.shown >= live.target.length) live.caret?.remove();
+  const text = document.querySelector('#chapter-end-actions .live-status-text');
+  if (text) text.textContent = message;
+}
+
+export function showLiveChapterError(idx, message) {
+  if (live.idx !== idx) return;
+  const partial = !!live.target;
+  stopLiveChapter();
+  const endEl = document.getElementById('chapter-end-actions');
+  endEl.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'live-status live-error';
+  box.setAttribute('role', 'alert');
+  box.textContent = partial
+    ? `הכתיבה נעצרה באמצע — ${message}`
+    : `לא הצלחנו לכתוב את הפרק — ${message}`;
+  const row = document.createElement('div');
+  row.className = 'complete-btn-row';
+  const actions = [
+    ['נסה שוב', 'secondary-btn', () => generateChapterAt(idx, { openAfter: true }).catch(() => {})],
+    ['חזרה לתוכן העניינים', 'back-to-library-btn', showLibrary]
+  ];
+  actions.forEach(([label, className, fn]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = className;
+    b.textContent = label;
+    b.onclick = fn;
+    row.appendChild(b);
+  });
+  endEl.append(box, row);
+  const nextBtn = document.getElementById('nav-next-chapter');
+  if (nextBtn) nextBtn.textContent = 'הכתיבה נעצרה';
+}
+
+export function stopLiveChapter() {
+  if (live.frame) cancelAnimationFrame(live.frame);
+  live.caret?.remove();
+  Object.assign(live, { idx: null, target: '', shown: 0, frame: 0, done: false, nodes: [], caret: null });
+  document.getElementById('reading-chapter-content')?.classList.remove('live-writing');
+  document.getElementById('nav-next-chapter')?.classList.remove('live-progress');
+}
+
 // ===== OPEN CHAPTER =====
-export function openChapter(idx) {
+/** `keepScroll`: the chapter is already on screen (written live) — stay where the reader is */
+export function openChapter(idx, { keepScroll = false } = {}) {
   const chapter = store.state.chapters[idx];
   if (!chapter) return;
+  const keptScrollY = window.scrollY;
+  stopLiveChapter();
 
+  // A saved scroll position belongs to the chapter it was saved in
+  const resumeScroll = store.state.lastReadChapter === idx ? (store.state.lastReadScroll || 0) : 0;
   store.state.currentReadingChapter = idx;
   store.state.lastReadChapter = idx;
   recordLastReadingSession(store.state.id, idx);
@@ -134,28 +322,12 @@ export function openChapter(idx) {
     }).catch(() => {});
   }
 
-  document.getElementById('reading-chapter-label').textContent = `פרק ${chapter.number} מתוך ${store.state.totalChapters}`;
-  document.getElementById('reading-chapter-num').textContent = `פרק ${chapter.number}`;
-  document.getElementById('reading-chapter-title').textContent =
-    sanitizeChapterTitle(chapter.title, chapter.number || idx + 1);
-
-  // Epigraph from book outline
-  const outline = store.state.book?.chapterOutlines?.[idx];
-  document.getElementById('reading-chapter-epigraph').textContent =
-    outline?.pov ? `נקודת מבט: ${outline.pov}` : '';
+  fillChapterHeading(idx, chapter.title);
 
   // Format content
   const contentEl = document.getElementById('reading-chapter-content');
-  const paragraphs = chapter.text
-    .split(/\n+/)
-    .map(p => p.trim())
-    .filter(p => p.length > 0)
-    .map(p => {
-      if (p === '[***]' || p === '***' || p === '* * *') {
-        return '<div class="chapter-divider">✦ ✦ ✦</div>';
-      }
-      return `<p>${escapeHtml(p)}</p>`;
-    })
+  const paragraphs = chapterParagraphs(chapter.text)
+    .map(p => (isDividerLine(p) ? '<div class="chapter-divider">✦ ✦ ✦</div>' : `<p>${escapeHtml(p)}</p>`))
     .join('');
 
   contentEl.innerHTML = paragraphs;
@@ -200,7 +372,8 @@ export function openChapter(idx) {
   renderReadingNav(idx);
   showScreen('reading-screen');
   updateLandscapeToggleButton();
-  const scrollY = (store.state.lastReadChapter === idx && store.state.lastReadScroll) ? store.state.lastReadScroll : 0;
+  const scrollY = keepScroll ? keptScrollY : resumeScroll;
+  store.state.lastReadScroll = scrollY;
   window.scrollTo(0, scrollY);
 
   let scrollSaveTimer;

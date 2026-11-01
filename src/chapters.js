@@ -42,8 +42,13 @@ import {
   maybeCompressStorySynopsis
 } from './prefs-export.js';
 import {
+  isLiveChapterShown,
   openChapter,
-  renderReadingNav
+  renderReadingNav,
+  setLiveChapterStatus,
+  showLiveChapter,
+  showLiveChapterError,
+  updateLiveChapter
 } from './reading.js';
 import {
   showScreen
@@ -144,6 +149,25 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
   const outline = store.state.book.chapterOutlines[idx]
     || { title: `פרק ${chapterNum}`, summary: '', pov: '' };
 
+  // A reader waiting for this chapter sees it on the reading screen as it is written,
+  // from the first sentence — unless they went elsewhere in the meantime.
+  let liveStarted = false;
+  let liveDeclined = !openAfter || background;
+  const onLiveText = (liveText) => {
+    if (liveDeclined || store.state !== genState) return;
+    if (!liveStarted) {
+      if (countWords(liveText) < 12) return; // open on a sentence, not on a fragment
+      const screen = document.querySelector('.screen.active')?.id;
+      if (!['library-screen', 'reading-screen', 'loading-screen'].includes(screen)) {
+        liveDeclined = true;
+        return;
+      }
+      liveStarted = true;
+      showLiveChapter(idx);
+    }
+    updateLiveChapter(idx, liveText);
+  };
+
   if (!background) {
     setWriteUiActive(true);
   } else {
@@ -166,7 +190,7 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     let lastWriteErr;
     for (let writeAttempt = 0; writeAttempt < 2; writeAttempt++) {
       try {
-        text = await writeChapter(idx, plan, onScene);
+        text = await writeChapter(idx, plan, onScene, onLiveText);
         break;
       } catch (e) {
         assertSameBook();
@@ -181,8 +205,12 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     assertSameBook();
     let validatedText = text;
 
+    // The reader is already reading this text: a full rewrite would pull it out from under
+    // them, so the review (whose only remedy is that rewrite) runs only when nobody watches.
+    const readerWatching = isLiveChapterShown(idx);
+    setLiveChapterStatus(idx, 'הפרק נכתב ✦ מעדכן את ספר הזיכרון...');
     setPreparingStatus(`מוודא שהפרק ${chapterNum} מוכן...`, useLoadingScreen);
-    let review = await reviewChapter(text, idx, plan);
+    let review = readerWatching ? { approved: true, issues: [] } : await reviewChapter(text, idx, plan);
     assertSameBook();
     let fixAttempts = 0;
     while (!review.approved && fixAttempts < cfg.MAX_CHAPTER_FIXES) {
@@ -226,7 +254,7 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     if (!background) setWriteUiActive(false);
     renderLibrary();
 
-    if (openAfter) openChapter(idx);
+    if (openAfter && (!liveStarted || isLiveChapterShown(idx))) openChapter(idx, { keepScroll: liveStarted });
     else if (isReadingScreenActive()) refreshReadingEndActions();
 
     notifyReadingChapterPipeline(idx, false);
@@ -247,12 +275,9 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     updatePrepareNextButton();
     if (!background) {
       setWriteUiActive(false);
-      if (useLoadingScreen) {
-        showScreen('library-screen');
-        showError('library-error', 'לא הצלחנו להכין את הפרק: ' + e.message);
-      } else {
-        showError('library-error', 'לא הצלחנו להכין את הפרק: ' + e.message);
-      }
+      showError('library-error', 'לא הצלחנו להכין את הפרק: ' + e.message);
+      if (isLiveChapterShown(idx)) showLiveChapterError(idx, e.message);
+      else if (useLoadingScreen) showScreen('library-screen');
       showReadingPreparing(false);
     }
     throw e;
@@ -709,7 +734,7 @@ export function chapterContinuationContext(outline, plan) {
   ].filter(Boolean).join('\n');
 }
 
-export async function continueProse(existing, instruction, maxTokens = 4096, context = '') {
+export async function continueProse(existing, instruction, maxTokens = 4096, context = '', onText = null) {
   const style = buildStyleInstructions(getBookProfile());
   const prompt = `המשך את הטקסט בעברית ספרותית — בדיוק מהנקודה שבה נעצר, בלי לחזור על פסקאות שכבר נכתבו.
 ${instruction}
@@ -721,20 +746,29 @@ ${style}
 
 כתוב המשך בלבד — פרוזה, ללא כותרות והסברים. סיים במשפט שלם.`;
 
-  const { text, finishReason } = await callGeminiRaw(prompt, '', maxTokens);
+  const { text, finishReason } = await callGeminiRaw(
+    prompt, '', maxTokens, 4, cfg.GEMINI_MODEL_PROSE, onText ? { onText } : {}
+  );
   return { text: text.trim(), finishReason };
 }
 
-export async function extendProse(text, instruction, minWords, maxRounds = cfg.PROSE_EXTEND_MAX_ROUNDS, maxTokens = 4096, initialFinishReason = 'STOP', context = '') {
+/** `onText(wholeText)` follows the text live, continuations included */
+export async function extendProse(text, instruction, minWords, maxRounds = cfg.PROSE_EXTEND_MAX_ROUNDS, maxTokens = 4096, initialFinishReason = 'STOP', context = '', onText = null) {
   let result = text.trim();
   let finishReason = initialFinishReason || 'STOP';
   for (let r = 0; r < maxRounds && isOutputTruncated(result, finishReason, minWords); r++) {
     // Continue from the last complete sentence, never from a half word
     const cut = trimToLastSentence(result);
-    const cont = await continueProse(cut.text, instruction, maxTokens, context);
+    const mergeOpts = { sameParagraph: cut.trimmed && !cut.paragraphEnd };
+    // Wait for enough of the continuation that a restated tail can be recognised and dropped
+    const onContinuation = onText && (partial => {
+      if (partial.length >= 150) onText(mergeContinuation(cut.text, partial, mergeOpts));
+    });
+    const cont = await continueProse(cut.text, instruction, maxTokens, context, onContinuation);
     if (!cont.text) break;
-    result = mergeContinuation(cut.text, cont.text, { sameParagraph: cut.trimmed && !cut.paragraphEnd });
+    result = mergeContinuation(cut.text, cont.text, mergeOpts);
     finishReason = cont.finishReason;
+    if (onText) onText(result);
   }
   return result;
 }
@@ -750,7 +784,8 @@ export async function finalizeChapterEnding(fullText, idx, plan, ctx) {
     cfg.PROSE_EXTEND_MAX_ROUNDS,
     6144,
     'STOP',
-    ctx.continuationContext
+    ctx.continuationContext,
+    ctx.onLiveText
   );
   if (!endsWithCompleteSentence(merged)) {
     merged = await extendProse(
@@ -760,7 +795,8 @@ export async function finalizeChapterEnding(fullText, idx, plan, ctx) {
       2,
       4096,
       'STOP',
-      ctx.continuationContext
+      ctx.continuationContext,
+      ctx.onLiveText
     );
   }
   return merged;
@@ -771,8 +807,8 @@ export async function finalizeChapterEnding(fullText, idx, plan, ctx) {
  * single request against the prose model's small daily quota (it used to be one per scene
  * plus continuations). Continuations only run if the reply still comes back cut off.
  */
-export async function writeChapter(idx, plan, onSceneProgress) {
-  const ctx = buildChapterContext(idx, plan);
+export async function writeChapter(idx, plan, onSceneProgress, onLiveText = null) {
+  const ctx = { ...buildChapterContext(idx, plan), onLiveText };
   const { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext } = ctx;
 
   const scenes = plan.scenes?.length
@@ -804,7 +840,9 @@ ${sceneLines}
 - פרוזה בלבד, ללא כותרות.`;
 
   if (onSceneProgress) onSceneProgress(0, 1);
-  const { text, finishReason } = await callGeminiRaw(prompt, '', cfg.CHAPTER_MAX_TOKENS);
+  const { text, finishReason } = await callGeminiRaw(
+    prompt, '', cfg.CHAPTER_MAX_TOKENS, 4, cfg.GEMINI_MODEL_PROSE, onLiveText ? { onText: onLiveText } : {}
+  );
   let full = await extendProse(
     text,
     'השלם את הפרק לפי התכנון וסיים אותו ב-hook.',
@@ -812,7 +850,8 @@ ${sceneLines}
     cfg.PROSE_EXTEND_MAX_ROUNDS,
     6144,
     finishReason,
-    ctx.continuationContext
+    ctx.continuationContext,
+    onLiveText
   );
   full = await finalizeChapterEnding(full, idx, plan, ctx);
   assertChapterTextValid(full);

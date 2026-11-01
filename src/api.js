@@ -224,8 +224,9 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
       const response = await enqueueGeminiRequest(() => {
         // Timeout starts when the request is actually sent, not while it waits in the queue
         timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        const endpoint = options.onText ? 'streamGenerateContent?alt=sse' : 'generateContent';
         return fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:${endpoint}`,
           {
             method: 'POST',
             headers: {
@@ -285,6 +286,15 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
         throw new Error(msg);
       }
 
+      if (options.onText) {
+        recordQuotaUse(model);
+        // From here the limit is on silence between chunks, not on the whole reply
+        return await readGeminiStream(response, options.onText, () => {
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => controller.abort(), cfg.GEMINI_STREAM_IDLE_TIMEOUT_MS);
+        });
+      }
+
       const data = await response.json();
       recordQuotaUse(model);
       const candidate = data.candidates?.[0];
@@ -308,7 +318,7 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
       if (e.modelNotFound || isModelNotFoundError(e, e.status)) throw e;
       if (e.message && e.message.includes('הגעת למכסה החינמית')) throw e;
       if (isQuotaApiError(null, e.message) && isDailyQuotaError(e.message)) throw quotaExceededError(e.message);
-      if (attempt < retries && (e.message.includes('503') || e.message.includes('fetch'))) {
+      if (attempt < retries && (e.streamInterrupted || e.message.includes('503') || e.message.includes('fetch'))) {
         const waitSec = (attempt + 1) * 8;
         await delay(waitSec * 1000);
         continue;
@@ -317,6 +327,61 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
     }
   }
   throw new Error('השרת עמוס מדי — נסה שוב מאוחר יותר');
+}
+
+/**
+ * Reads a streamGenerateContent (SSE) reply, calling onText with the whole text so far after
+ * each chunk. A stream that breaks off after enough text returns what arrived, marked
+ * INTERRUPTED, so the caller continues it like a cut-off reply instead of paying for it again.
+ */
+export async function readGeminiStream(response, onText, onActivity = () => {}) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+  let finishReason = '';
+  const handleLine = (line) => {
+    if (!line.startsWith('data:')) return;
+    let data;
+    try { data = JSON.parse(line.slice(5)); } catch (_) { return; }
+    if (data.error) {
+      const err = new Error(data.error.message || 'שגיאת API');
+      err.fromApi = true;
+      throw err;
+    }
+    const candidate = data.candidates?.[0];
+    const piece = (candidate?.content?.parts || [])
+      .filter(p => !p.thought)
+      .map(p => p.text || '')
+      .join('');
+    if (candidate?.finishReason) finishReason = candidate.finishReason;
+    if (piece) {
+      text += piece;
+      onText(text);
+    }
+  };
+  try {
+    onActivity();
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      onActivity();
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        handleLine(line);
+      }
+    }
+    handleLine(buffer.trim());
+  } catch (e) {
+    if (countWords(text) >= cfg.STREAM_KEEP_PARTIAL_MIN_WORDS) return { text, finishReason: 'INTERRUPTED' };
+    // A dropped connection is worth another try; a timeout or an API error is handled by the caller
+    if (e.name !== 'AbortError' && !e.fromApi) e.streamInterrupted = true;
+    throw e;
+  }
+  return { text, finishReason };
 }
 
 export async function callGeminiRawWithModelChain(chain, appKey, primaryModel, prompt, systemPrompt, maxTokens, retries, options = {}) {
@@ -339,9 +404,12 @@ export async function callGeminiRawWithModelChain(chain, appKey, primaryModel, p
   throw new Error(`מודלי ${chainLabel} לא זמינים (${tried}) — בדוק ב-Google AI Studio אילו מודלים פעילים בפרויקט.`);
 }
 
-/** Prose text: thinking is capped so the output budget goes to the chapter itself */
-export async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE) {
-  const options = { thinkingBudget: cfg.PROSE_THINKING_BUDGET };
+/**
+ * Prose text: thinking is capped so the output budget goes to the chapter itself.
+ * `options.onText(textSoFar)` streams the reply as it is written.
+ */
+export async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE, extraOptions = {}) {
+  const options = { thinkingBudget: cfg.PROSE_THINKING_BUDGET, ...extraOptions };
   if (model !== cfg.GEMINI_MODEL_PROSE) {
     return callGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model, options);
   }
@@ -402,7 +470,7 @@ export function assertChapterTextValid(text) {
 }
 
 export function isOutputTruncated(text, finishReason, minWords) {
-  if (finishReason === 'MAX_TOKENS' || finishReason === 'LENGTH') return true;
+  if (finishReason === 'MAX_TOKENS' || finishReason === 'LENGTH' || finishReason === 'INTERRUPTED') return true;
   if (countWords(text) < minWords) return true;
   if (!endsWithCompleteSentence(text)) return true;
   // בדיקה נוספת: אם הטקסט נגמר באמצע דיאלוג פתוח.
