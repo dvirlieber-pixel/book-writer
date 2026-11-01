@@ -1,4 +1,13 @@
 // Gemini API client
+import * as cfg from './constants.js';
+import { store } from './store.js';
+import {
+  getStoredApiKey
+} from './creation-resume.js';
+import {
+  save
+} from './storage.js';
+
 // ===== API CALL =====
 
 const geminiRateLimiter = {
@@ -11,34 +20,34 @@ const geminiRateLimiter = {
 
 const geminiPriorityStack = ['normal'];
 
-function setGeminiCallPriority(priority) {
+export function setGeminiCallPriority(priority) {
   geminiPriorityStack.push(priority);
 }
 
-function popGeminiCallPriority() {
+export function popGeminiCallPriority() {
   if (geminiPriorityStack.length > 1) geminiPriorityStack.pop();
 }
 
-function resolveGeminiPriority(options = {}) {
+export function resolveGeminiPriority(options = {}) {
   return options.priority || geminiPriorityStack[geminiPriorityStack.length - 1] || 'normal';
 }
 
-function isDailyQuotaError(message) {
+export function isDailyQuotaError(message) {
   const m = (message || '').toLowerCase();
   return /per day|daily limit|quota.*day|requests per day|\brpd\b|per 24/.test(m);
 }
 
-function pruneGeminiRequestWindow(now = Date.now()) {
+export function pruneGeminiRequestWindow(now = Date.now()) {
   geminiRateLimiter.recentTimestamps = geminiRateLimiter.recentTimestamps.filter(t => now - t < 60000);
 }
 
-function scheduleGeminiPause(ms) {
+export function scheduleGeminiPause(ms) {
   const pause = Math.max(ms, 5000);
   geminiRateLimiter.pausedUntil = Math.max(geminiRateLimiter.pausedUntil, Date.now() + pause);
   return pause;
 }
 
-function showGeminiRateLimitStatus(waitMs) {
+export function showGeminiRateLimitStatus(waitMs) {
   const sec = Math.ceil(waitMs / 1000);
   const msg = sec > 8
     ? `ממתין ${sec} שניות — מגבלת קצב של Gemini (האפליקציה ממשיכה אוטומטית)...`
@@ -48,7 +57,7 @@ function showGeminiRateLimitStatus(waitMs) {
   if (el) el.textContent = msg;
 }
 
-async function waitForGeminiSlot() {
+export async function waitForGeminiSlot() {
   const delay = ms => new Promise(res => setTimeout(res, ms));
   while (true) {
     const now = Date.now();
@@ -59,27 +68,27 @@ async function waitForGeminiSlot() {
       continue;
     }
     pruneGeminiRequestWindow(now);
-    if (geminiRateLimiter.recentTimestamps.length >= GEMINI_MAX_REQUESTS_PER_MINUTE) {
+    if (geminiRateLimiter.recentTimestamps.length >= cfg.GEMINI_MAX_REQUESTS_PER_MINUTE) {
       const oldest = geminiRateLimiter.recentTimestamps[0];
       const waitMs = 60000 - (now - oldest) + 250;
       showGeminiRateLimitStatus(waitMs);
       await delay(Math.min(waitMs, 5000));
       continue;
     }
-    const gap = GEMINI_MIN_REQUEST_GAP_MS - (now - geminiRateLimiter.lastRequestAt);
+    const gap = cfg.GEMINI_MIN_REQUEST_GAP_MS - (now - geminiRateLimiter.lastRequestAt);
     if (gap > 0) await delay(gap);
     return;
   }
 }
 
-function recordGeminiRequest() {
+export function recordGeminiRequest() {
   const now = Date.now();
   geminiRateLimiter.lastRequestAt = now;
   geminiRateLimiter.recentTimestamps.push(now);
   pruneGeminiRequestWindow(now);
 }
 
-function enqueueGeminiRequest(fn, priority = 'normal') {
+export function enqueueGeminiRequest(fn, priority = 'normal') {
   return new Promise((resolve, reject) => {
     const job = { fn, resolve, reject, priority };
     if (priority === 'high') {
@@ -95,7 +104,7 @@ function enqueueGeminiRequest(fn, priority = 'normal') {
   });
 }
 
-async function pumpGeminiRequestQueue() {
+export async function pumpGeminiRequestQueue() {
   if (geminiRateLimiter.pumping) return;
   geminiRateLimiter.pumping = true;
   try {
@@ -116,57 +125,57 @@ async function pumpGeminiRequestQueue() {
   }
 }
 
-function isQuotaApiError(status, message) {
+export function isQuotaApiError(status, message) {
   if (status === 429) return true;
   const m = (message || '').toLowerCase();
   return /quota|rate limit|resource.?exhausted|too many requests|exceeded|per day|per minute/.test(m);
 }
 
-function quotaExceededError(originalMsg) {
+export function quotaExceededError(originalMsg) {
   const detail = originalMsg ? ` (${originalMsg})` : '';
   return new Error(
     `הגעת למכסה החינמית של Gemini — בקשות לדקה או ליום.${detail}\n\n` +
-    `• בדיקת שימוש ומגבלות: ${GEMINI_RATE_LIMITS_URL}\n` +
+    `• בדיקת שימוש ומגבלות: ${cfg.GEMINI_RATE_LIMITS_URL}\n` +
     `• המכסה מתאפסת בדרך כלל בחצות שעון Pacific (לרוב בבוקר בישראל)\n` +
     `• נסה שוב מאוחר למחר, או הפעל חיוב ב-Google AI Studio לשימוש נוסף`
   );
 }
 
-function normalizeApiError(e, status, apiMessage) {
+export function normalizeApiError(e, status, apiMessage) {
   if (isQuotaApiError(status, apiMessage || e?.message)) return quotaExceededError(apiMessage);
   return e;
 }
 
-function isModelNotFoundError(e, httpStatus) {
+export function isModelNotFoundError(e, httpStatus) {
   if (httpStatus === 404 || e?.status === 404) return true;
   const m = (e?.message || '').toLowerCase();
   return /404|not found|not_found|invalid model|unknown model|does not exist|is not supported|no longer available/.test(m);
 }
 
-function setModelFallback(appKey, activeModelId) {
-  if (app[appKey] === activeModelId) return;
-  app[appKey] = activeModelId;
+export function setModelFallback(appKey, activeModelId) {
+  if (store.app[appKey] === activeModelId) return;
+  store.app[appKey] = activeModelId;
   save();
   refreshModelFallbackNotice();
 }
 
-function clearModelFallbackIfPrimary(appKey, primaryModel) {
-  if (!app[appKey]) return;
-  delete app[appKey];
+export function clearModelFallbackIfPrimary(appKey, primaryModel) {
+  if (!store.app[appKey]) return;
+  delete store.app[appKey];
   save();
   refreshModelFallbackNotice();
 }
 
-function refreshModelFallbackNotice() {
+export function refreshModelFallbackNotice() {
   const parts = [];
-  if (app.liteModelFallback && app.liteModelFallback !== GEMINI_MODEL_LITE) {
+  if (store.app.liteModelFallback && store.app.liteModelFallback !== cfg.GEMINI_MODEL_LITE) {
     parts.push(
-      `${GEMINI_MODEL_LABELS[GEMINI_MODEL_LITE]} לא זמין בפרויקט — משתמשים ב-${GEMINI_MODEL_LABELS[app.liteModelFallback] || app.liteModelFallback} לתכנון, זיכרון וסיכומים.`
+      `${cfg.GEMINI_MODEL_LABELS[cfg.GEMINI_MODEL_LITE]} לא זמין בפרויקט — משתמשים ב-${cfg.GEMINI_MODEL_LABELS[store.app.liteModelFallback] || store.app.liteModelFallback} לתכנון, זיכרון וסיכומים.`
     );
   }
-  if (app.proseModelFallback && app.proseModelFallback !== GEMINI_MODEL_PROSE) {
+  if (store.app.proseModelFallback && store.app.proseModelFallback !== cfg.GEMINI_MODEL_PROSE) {
     parts.push(
-      `${GEMINI_MODEL_LABELS[GEMINI_MODEL_PROSE]} לא זמין בפרויקט — משתמשים ב-${GEMINI_MODEL_LABELS[app.proseModelFallback] || app.proseModelFallback} לכתיבת פרקים.`
+      `${cfg.GEMINI_MODEL_LABELS[cfg.GEMINI_MODEL_PROSE]} לא זמין בפרויקט — משתמשים ב-${cfg.GEMINI_MODEL_LABELS[store.app.proseModelFallback] || store.app.proseModelFallback} לכתיבת פרקים.`
     );
   }
   const msg = parts.join('\n\n');
@@ -176,7 +185,7 @@ function refreshModelFallbackNotice() {
   });
 }
 
-async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE, options = {}) {
+export async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE, options = {}) {
   const priority = resolveGeminiPriority(options);
   return enqueueGeminiRequest(
     () => executeGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model, options),
@@ -184,7 +193,7 @@ async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries
   );
 }
 
-async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE, options = {}) {
+export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE, options = {}) {
   const delay = ms => new Promise(res => setTimeout(res, ms));
   const generationConfig = {
     maxOutputTokens: maxTokens,
@@ -197,7 +206,7 @@ async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retr
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), GEMINI_FETCH_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), cfg.GEMINI_FETCH_TIMEOUT_MS);
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -223,7 +232,7 @@ async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retr
         const retryHdr = parseInt(response.headers.get('Retry-After'), 10);
         const backoffMs = scheduleGeminiPause(
           (retryHdr && !Number.isNaN(retryHdr) ? retryHdr * 1000 : null)
-          || GEMINI_RATE_LIMIT_PAUSE_MS * (attempt + 1)
+          || cfg.GEMINI_RATE_LIMIT_PAUSE_MS * (attempt + 1)
         );
         if (attempt < retries) {
           showGeminiRateLimitStatus(backoffMs);
@@ -279,9 +288,9 @@ async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retr
   throw new Error('השרת עמוס מדי — נסה שוב מאוחר יותר');
 }
 
-async function callGeminiRawWithModelChain(chain, appKey, primaryModel, prompt, systemPrompt, maxTokens, retries, options = {}) {
+export async function callGeminiRawWithModelChain(chain, appKey, primaryModel, prompt, systemPrompt, maxTokens, retries, options = {}) {
   let lastErr;
-  const chainLabel = chain === GEMINI_LITE_MODEL_CHAIN ? 'Lite' : 'כתיבה';
+  const chainLabel = chain === cfg.GEMINI_LITE_MODEL_CHAIN ? 'Lite' : 'כתיבה';
   for (let i = 0; i < chain.length; i++) {
     const model = chain[i];
     try {
@@ -295,66 +304,63 @@ async function callGeminiRawWithModelChain(chain, appKey, primaryModel, prompt, 
       throw e;
     }
   }
-  const tried = chain.map(m => GEMINI_MODEL_LABELS[m] || m).join(' / ');
+  const tried = chain.map(m => cfg.GEMINI_MODEL_LABELS[m] || m).join(' / ');
   throw new Error(`מודלי ${chainLabel} לא זמינים (${tried}) — בדוק ב-Google AI Studio אילו מודלים פעילים בפרויקט.`);
 }
 
-async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE) {
-  if (model !== GEMINI_MODEL_PROSE) {
+export async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE) {
+  if (model !== cfg.GEMINI_MODEL_PROSE) {
     return callGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model);
   }
   return callGeminiRawWithModelChain(
-    GEMINI_PROSE_MODEL_CHAIN, 'proseModelFallback', GEMINI_MODEL_PROSE, prompt, systemPrompt, maxTokens, retries
+    cfg.GEMINI_PROSE_MODEL_CHAIN, 'proseModelFallback', cfg.GEMINI_MODEL_PROSE, prompt, systemPrompt, maxTokens, retries
   );
 }
 
-async function callGemini(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = GEMINI_MODEL_PROSE) {
+export async function callGemini(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE) {
   const { text } = await callGeminiRaw(prompt, systemPrompt, maxTokens, retries, model);
   return text;
 }
 
-async function callGeminiLiteRaw(prompt, systemPrompt = '', maxTokens = 4096, options = {}) {
+export async function callGeminiLiteRaw(prompt, systemPrompt = '', maxTokens = 4096, options = {}) {
   return callGeminiRawWithModelChain(
-    GEMINI_LITE_MODEL_CHAIN, 'liteModelFallback', GEMINI_MODEL_LITE, prompt, systemPrompt, maxTokens, 4, options
+    cfg.GEMINI_LITE_MODEL_CHAIN, 'liteModelFallback', cfg.GEMINI_MODEL_LITE, prompt, systemPrompt, maxTokens, 4, options
   );
 }
 
-async function callGeminiLite(prompt, systemPrompt = '', maxTokens = 4096, options = {}) {
+export async function callGeminiLite(prompt, systemPrompt = '', maxTokens = 4096, options = {}) {
   const { text } = await callGeminiLiteRaw(prompt, systemPrompt, maxTokens, options);
   return text;
 }
 
-const MIN_CHAPTER_WORDS = 900;
-const PROSE_EXTEND_MAX_ROUNDS = 4;
-
-function countWords(text) {
+export function countWords(text) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function endsWithCompleteSentence(text) {
+export function endsWithCompleteSentence(text) {
   const t = text.trim();
   if (!t) return false;
   if (/\.{3}\s*$/.test(t)) return false;
   return /[.!?…]["'»”]?\s*$/.test(t) || /[.!?…]["'»”]?$/.test(t.slice(-4));
 }
 
-function isChapterTextValid(text) {
-  return countWords(text) >= MIN_CHAPTER_WORDS && endsWithCompleteSentence(text);
+export function isChapterTextValid(text) {
+  return countWords(text) >= cfg.MIN_CHAPTER_WORDS && endsWithCompleteSentence(text);
 }
 
-function chapterValidationError(text) {
+export function chapterValidationError(text) {
   const words = countWords(text);
-  if (words < MIN_CHAPTER_WORDS) return `הפרק קצר מדי (${words} מילים)`;
+  if (words < cfg.MIN_CHAPTER_WORDS) return `הפרק קצר מדי (${words} מילים)`;
   if (!endsWithCompleteSentence(text)) return 'הפרק נסגר ללא סיום מלא';
   return null;
 }
 
-function assertChapterTextValid(text) {
+export function assertChapterTextValid(text) {
   const err = chapterValidationError(text);
   if (err) throw new Error(`${err} — נסה שוב`);
 }
 
-function isOutputTruncated(text, finishReason, minWords) {
+export function isOutputTruncated(text, finishReason, minWords) {
   if (finishReason === 'MAX_TOKENS' || finishReason === 'LENGTH') return true;
   if (countWords(text) < minWords) return true;
   if (!endsWithCompleteSentence(text)) return true;
@@ -364,7 +370,7 @@ function isOutputTruncated(text, finishReason, minWords) {
   return false;
 }
 
-function mergeContinuation(existing, continuation) {
+export function mergeContinuation(existing, continuation) {
   const tail = existing.trimEnd();
   const head = continuation.trimStart();
   if (!head) return tail;
@@ -381,7 +387,7 @@ function mergeContinuation(existing, continuation) {
 }
 
 /** בדיקה קלילה של מפתח API — countTokens, ללא תור ה-rate limiter */
-async function verifyGeminiApiKey(apiKey) {
+export async function verifyGeminiApiKey(apiKey) {
   const key = (apiKey || '').trim();
   if (!key) return { ok: false, message: 'הזן מפתח לפני הבדיקה.' };
 
@@ -389,7 +395,7 @@ async function verifyGeminiApiKey(apiKey) {
   const timeoutId = setTimeout(() => controller.abort(), 20000);
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_LITE}:countTokens`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${cfg.GEMINI_MODEL_LITE}:countTokens`,
       {
         method: 'POST',
         headers: {

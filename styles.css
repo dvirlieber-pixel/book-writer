@@ -1,3 +1,8 @@
+/* Set from JS on <html>; must not be redeclared on body or the theme rule shadows it */
+:root {
+    --read-font-scale: 1;
+  }
+
 :root,
   body.theme-dark {
     color-scheme: dark;
@@ -9,7 +14,6 @@
     --rust: #7a3b1e;
     --shadow: rgba(26,20,16,0.4);
     --glow: rgba(201,168,76,0.15);
-    --read-font-scale: 1;
     --text-muted: rgba(245,239,227,0.6);
     --text-faint: rgba(245,239,227,0.45);
     --surface: rgba(245,239,227,0.04);

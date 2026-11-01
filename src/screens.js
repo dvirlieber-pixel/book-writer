@@ -1,14 +1,53 @@
 // Screen routing & welcome wizard
+import * as cfg from './constants.js';
+import { store } from './store.js';
+import { defaultBookProfile } from './book-model.js';
+import {
+  refreshModelFallbackNotice
+} from './api.js';
+import {
+  collectWelcomeProfile,
+  syncWelcomeUIFromProfile,
+  validateWelcomeSelections
+} from './book.js';
+import {
+  getStoredApiKey,
+  maybeAutoVerifyApiKey,
+  updateApiKeyStatus
+} from './creation-resume.js';
+import {
+  renderLibrary
+} from './library.js';
+import {
+  applyReadingPrefs,
+  applyTasteProfile,
+  lockAppOrientation,
+  releaseWakeLock,
+  updateLandscapeToggleButton
+} from './prefs-export.js';
+import {
+  closeChapterDrawer
+} from './reading.js';
+import {
+  openBookFromShelf,
+  renderShelf,
+  renderShelfContinueFab,
+  shelfCount
+} from './shelf.js';
+import {
+  showError
+} from './utils.js';
+
 // ===== SCREEN MANAGEMENT =====
 let welcomeWizardStep = 1;
 
 const WELCOME_WIZARD_STEPS = 3;
 
-function showScreen(id) {
+export function showScreen(id) {
   if (id !== 'reading-screen') {
     releaseWakeLock();
     document.body.classList.remove('reading-immersive');
-    if (app.readingPrefs) app.readingPrefs.allowLandscape = false;
+    if (store.app.readingPrefs) store.app.readingPrefs.allowLandscape = false;
     lockAppOrientation();
   }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -27,13 +66,13 @@ function showScreen(id) {
   }
 }
 
-function showLibrary() {
+export function showLibrary() {
   closeChapterDrawer();
   renderLibrary();
   showScreen('library-screen');
 }
 
-function validateWizardStep1() {
+export function validateWizardStep1() {
   const p = collectWelcomeProfile();
   const hasGenre = !!(p.genre && (p.genre !== 'other' || p.genreCustom?.trim()));
   const hasHook = !!p.hook?.trim();
@@ -42,18 +81,18 @@ function validateWizardStep1() {
   return hasGenre || hasHook || hasAuthor || hasBookRef;
 }
 
-function canSkipWelcomeWizard() {
+export function canSkipWelcomeWizard() {
   return !!getStoredApiKey() && validateWelcomeSelections();
 }
 
-function resetWelcomeWizard(step) {
+export function resetWelcomeWizard(step) {
   welcomeWizardStep = step || 1;
   const err = document.getElementById('welcome-error');
   if (err) err.style.display = 'none';
   updateWelcomeWizardUI();
 }
 
-function syncWelcomeApiKeyField() {
+export function syncWelcomeApiKeyField() {
   const input = document.getElementById('api-key-input');
   const key = getStoredApiKey();
   if (input && key && !input.value.trim()) input.value = key;
@@ -62,7 +101,7 @@ function syncWelcomeApiKeyField() {
   maybeAutoVerifyApiKey();
 }
 
-function updateWelcomeWizardUI() {
+export function updateWelcomeWizardUI() {
   for (let i = 1; i <= WELCOME_WIZARD_STEPS; i++) {
     const panel = document.getElementById(`wizard-step-${i}`);
     if (!panel) continue;
@@ -101,7 +140,7 @@ function updateWelcomeWizardUI() {
   if (welcomeWizardStep === 3) syncWelcomeApiKeyField();
 }
 
-function setWelcomeWizardStep(step, { focusApi = false } = {}) {
+export function setWelcomeWizardStep(step, { focusApi = false } = {}) {
   const next = Math.min(WELCOME_WIZARD_STEPS, Math.max(1, step));
   if (next > welcomeWizardStep && next > 1 && !validateWizardStep1()) {
     showError('welcome-error', 'בחר לפחות אחד: ז\'אנר, סופר, ספר, או רעיון חופשי.');
@@ -117,7 +156,7 @@ function setWelcomeWizardStep(step, { focusApi = false } = {}) {
   return true;
 }
 
-function nextWizardStep() {
+export function nextWizardStep() {
   if (welcomeWizardStep === 1) {
     if (!validateWizardStep1()) {
       showError('welcome-error', 'בחר לפחות אחד: ז\'אנר, סופר, ספר, או רעיון חופשי.');
@@ -130,14 +169,14 @@ function nextWizardStep() {
   }
 }
 
-function prevWizardStep() {
+export function prevWizardStep() {
   if (welcomeWizardStep > 1) {
     document.getElementById('welcome-error').style.display = 'none';
     setWelcomeWizardStep(welcomeWizardStep - 1);
   }
 }
 
-function goToWizardStep(step) {
+export function goToWizardStep(step) {
   const target = typeof step === 'number' ? step : parseInt(step, 10);
   if (!target || target < 1 || target > WELCOME_WIZARD_STEPS) return;
   if (target === welcomeWizardStep) return;
@@ -148,15 +187,29 @@ function goToWizardStep(step) {
   setWelcomeWizardStep(target, { focusApi: target === 3 });
 }
 
-function applyWelcomeDefaults() {
-  const p = app.readingPrefs || {};
+export function applyWelcomeDefaults() {
+  const p = store.app.readingPrefs || {};
   if (p.activeProfile) applyTasteProfile(p.activeProfile);
   else {
     const lk = p.defaultLengthKey || 'short';
-    readingLengthKey = lk;
-    state.totalChapters = LENGTH_PRESETS[lk]?.chapters || 15;
+    store.readingLengthKey = lk;
+    store.state.totalChapters = cfg.LENGTH_PRESETS[lk]?.chapters || 15;
     syncWelcomeUIFromProfile(defaultBookProfile(), lk);
   }
   document.querySelectorAll('.optional-input').forEach(el => { el.style.display = 'none'; });
   resetWelcomeWizard(1);
+}
+
+export function bootstrapAppScreens() {
+  if (shelfCount() > 1) {
+    renderShelf();
+    showScreen('shelf-screen');
+  } else if (store.state.book) {
+    renderLibrary();
+    showScreen('library-screen');
+  } else if (shelfCount() === 1) {
+    openBookFromShelf(Object.keys(store.app.books)[0]);
+  } else {
+    showScreen('welcome-screen');
+  }
 }

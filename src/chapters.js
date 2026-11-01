@@ -1,33 +1,87 @@
 // Chapter generation pipeline
+import * as cfg from './constants.js';
+import { store } from './store.js';
+import {
+  assertChapterTextValid,
+  callGeminiLite,
+  callGeminiLiteRaw,
+  callGeminiRaw,
+  countWords,
+  endsWithCompleteSentence,
+  isChapterTextValid,
+  isOutputTruncated,
+  mergeContinuation,
+  popGeminiCallPriority,
+  setGeminiCallPriority
+} from './api.js';
+import {
+  buildStyleInstructions,
+  genreDisplayLabel,
+  getBookProfile,
+  normalizeBlueprint,
+  sanitizeChapterTitle
+} from './book.js';
+import {
+  ensureMemoryBook,
+  formatMemoryBookForPrompt,
+  isReadingScreenActive,
+  migrateMemoryBook,
+  parseJsonFromResponse,
+  setPreparingStatus,
+  showReadingPreparing,
+  waitForGeneration
+} from './creation-resume.js';
+import {
+  renderLibrary
+} from './library.js';
+import {
+  getStoryContextForPrompt,
+  maybeCompressStorySynopsis
+} from './prefs-export.js';
+import {
+  openChapter,
+  renderReadingNav
+} from './reading.js';
+import {
+  showScreen
+} from './screens.js';
+import {
+  save
+} from './storage.js';
+import {
+  setWriteUiActive,
+  showError
+} from './utils.js';
+
 // ===== CHAPTER PIPELINE (מאחורי הקלעים) =====
-function requestChapterGeneration(idx, opts = {}) {
+export function requestChapterGeneration(idx, opts = {}) {
   return new Promise((resolve, reject) => {
-    const bookId = state.id;
-    const dup = chapterGenQueue.find(j => j.idx === idx && j.bookId === bookId);
+    const bookId = store.state.id;
+    const dup = store.chapterGenQueue.find(j => j.idx === idx && j.bookId === bookId);
     if (dup) {
       dup.resolves.push(resolve);
       dup.rejects.push(reject);
       pumpChapterGenQueue();
       return;
     }
-    chapterGenQueue.push({ idx, bookId, opts, resolves: [resolve], rejects: [reject] });
+    store.chapterGenQueue.push({ idx, bookId, opts, resolves: [resolve], rejects: [reject] });
     pumpChapterGenQueue();
   });
 }
 
-async function pumpChapterGenQueue() {
-  if (chapterGenPumpActive) return;
-  chapterGenPumpActive = true;
+export async function pumpChapterGenQueue() {
+  if (store.chapterGenPumpActive) return;
+  store.chapterGenPumpActive = true;
   try {
-    while (chapterGenQueue.length) {
-      const job = chapterGenQueue[0];
+    while (store.chapterGenQueue.length) {
+      const job = store.chapterGenQueue[0];
       // Job queued for a book that is no longer open — drop it quietly
-      if (job.bookId !== state.id) {
+      if (job.bookId !== store.state.id) {
         job.resolves.forEach(r => r());
-        chapterGenQueue.shift();
+        store.chapterGenQueue.shift();
         continue;
       }
-      if (state.writing && state.generatingIdx !== job.idx) {
+      if (store.state.writing && store.state.generatingIdx !== job.idx) {
         await waitForGeneration();
         continue;
       }
@@ -37,54 +91,54 @@ async function pumpChapterGenQueue() {
       } catch (e) {
         job.rejects.forEach(r => r(e));
       }
-      chapterGenQueue.shift();
+      store.chapterGenQueue.shift();
     }
   } finally {
-    chapterGenPumpActive = false;
-    if (chapterGenQueue.length) pumpChapterGenQueue();
+    store.chapterGenPumpActive = false;
+    if (store.chapterGenQueue.length) pumpChapterGenQueue();
   }
 }
 
-async function generateChapterAt(idx, opts = {}) {
+export async function generateChapterAt(idx, opts = {}) {
   return requestChapterGeneration(idx, opts);
 }
 
-async function runGenerateChapterAt(idx, { background = false, openAfter = false, useLoadingScreen = false } = {}) {
+export async function runGenerateChapterAt(idx, { background = false, openAfter = false, useLoadingScreen = false } = {}) {
   if (!navigator.onLine) {
     throw new Error('אין חיבור רשת — לא ניתן ליצור פרק חדש');
   }
-  if (!state.book || idx >= state.totalChapters) return;
-  if (idx < state.chapters.length) {
+  if (!store.state.book || idx >= store.state.totalChapters) return;
+  if (idx < store.state.chapters.length) {
     if (openAfter) openChapter(idx);
     return;
   }
-  if (state.writing) {
-    if (background && state.generatingIdx === idx) return;
+  if (store.state.writing) {
+    if (background && store.state.generatingIdx === idx) return;
     await waitForGeneration();
-    if (idx < state.chapters.length) {
+    if (idx < store.state.chapters.length) {
       if (openAfter) openChapter(idx);
       if (background) notifyReadingChapterPipeline(idx, false);
       return;
     }
-    if (state.writing) return;
+    if (store.state.writing) return;
   }
 
   ensureMemoryBook();
   // applyBookSnapshot replaces `state` wholesale; if that happens mid-generation,
   // stop before writing anything into the newly opened book.
-  const genState = state;
+  const genState = store.state;
   const assertSameBook = () => {
-    if (state !== genState) {
+    if (store.state !== genState) {
       const err = new Error('book switched during generation');
       err.bookSwitched = true;
       throw err;
     }
   };
   setGeminiCallPriority(background ? 'low' : 'high');
-  state.writing = true;
-  state.generatingIdx = idx;
+  store.state.writing = true;
+  store.state.generatingIdx = idx;
   const chapterNum = idx + 1;
-  const outline = state.book.chapterOutlines[idx]
+  const outline = store.state.book.chapterOutlines[idx]
     || { title: `פרק ${chapterNum}`, summary: '', pov: '' };
 
   if (!background) {
@@ -156,16 +210,16 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
     assertSameBook();
 
     // Commit chapter, memory and event log together (no await in between)
-    state.chapters.push({ title: sanitizeChapterTitle(outline.title, chapterNum), text, number: chapterNum });
-    if (memoryBook) state.memoryBook = memoryBook;
-    if (!state.eventLog) state.eventLog = [];
-    state.eventLog.push(`פרק ${chapterNum} (${outline.title}):\n${summary}`);
+    store.state.chapters.push({ title: sanitizeChapterTitle(outline.title, chapterNum), text, number: chapterNum });
+    if (memoryBook) store.state.memoryBook = memoryBook;
+    if (!store.state.eventLog) store.state.eventLog = [];
+    store.state.eventLog.push(`פרק ${chapterNum} (${outline.title}):\n${summary}`);
     save();
     await maybeCompressStorySynopsis();
     assertSameBook();
 
-    state.writing = false;
-    state.generatingIdx = null;
+    store.state.writing = false;
+    store.state.generatingIdx = null;
     save();
 
     if (!background) setWriteUiActive(false);
@@ -181,12 +235,12 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   } catch(e) {
     popGeminiCallPriority();
     if (e?.bookSwitched) {
-      // The open book is a different one now — leave its state and UI alone
+      // The open book is a different one now — leave its store.state and UI alone
       console.info(`chapter ${chapterNum} generation dropped: book switched`);
       return;
     }
-    state.writing = false;
-    state.generatingIdx = null;
+    store.state.writing = false;
+    store.state.generatingIdx = null;
     save();
     notifyReadingChapterPipeline(idx, false);
     updatePrepareNextButton();
@@ -204,9 +258,9 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   }
 }
 
-function notifyReadingChapterPipeline(generatingIdx, active) {
+export function notifyReadingChapterPipeline(generatingIdx, active) {
   if (!isReadingScreenActive()) return;
-  const cur = state.currentReadingChapter;
+  const cur = store.state.currentReadingChapter;
   if (cur == null || generatingIdx !== cur + 1) return;
   if (active) {
     showReadingPreparing(true, `מכין את פרק ${generatingIdx + 1}...`);
@@ -217,14 +271,14 @@ function notifyReadingChapterPipeline(generatingIdx, active) {
   }
 }
 
-function prefetchChapter(idx) {
-  if (idx >= state.totalChapters || idx < state.chapters.length) return;
+export function prefetchChapter(idx) {
+  if (idx >= store.state.totalChapters || idx < store.state.chapters.length) return;
   updatePrepareNextButton();
   generateChapterAt(idx, { background: true }).catch((err) => {
     console.warn('prepare chapter', idx + 1, err);
-    if (isReadingScreenActive() && state.currentReadingChapter === idx - 1) {
+    if (isReadingScreenActive() && store.state.currentReadingChapter === idx - 1) {
       showReadingPreparing(false);
-      renderReadingNav(state.currentReadingChapter);
+      renderReadingNav(store.state.currentReadingChapter);
     }
     if (document.getElementById('library-screen')?.classList.contains('active')) {
       showError('library-error', err.message);
@@ -233,51 +287,51 @@ function prefetchChapter(idx) {
   });
 }
 
-function prepareNextChapter() {
-  if (!state.book || !navigator.onLine) {
+export function prepareNextChapter() {
+  if (!store.state.book || !navigator.onLine) {
     if (!navigator.onLine) showError('library-error', 'אין חיבור רשת — לא ניתן להכין פרק');
     return;
   }
-  const idx = state.chapters.length;
-  if (idx >= state.totalChapters) return;
-  if (state.writing) return;
+  const idx = store.state.chapters.length;
+  if (idx >= store.state.totalChapters) return;
+  if (store.state.writing) return;
   document.getElementById('library-error').style.display = 'none';
   prefetchChapter(idx);
 }
 
-function updatePrepareNextButton() {
+export function updatePrepareNextButton() {
   const btn = document.getElementById('prepare-next-btn');
   if (!btn) return;
-  const written = state.chapters.length;
-  const total = state.totalChapters;
-  if (!state.book || written >= total || written === 0) {
+  const written = store.state.chapters.length;
+  const total = store.state.totalChapters;
+  if (!store.state.book || written >= total || written === 0) {
     btn.style.display = 'none';
     return;
   }
   const nextIdx = written;
-  const outline = state.book.chapterOutlines?.[nextIdx];
+  const outline = store.state.book.chapterOutlines?.[nextIdx];
   const label = outline?.title || `פרק ${nextIdx + 1}`;
-  if (state.writing && state.generatingIdx === nextIdx) {
+  if (store.state.writing && store.state.generatingIdx === nextIdx) {
     btn.style.display = 'flex';
     btn.disabled = true;
     btn.textContent = `⏳ מכין את "${label}" ברקע...`;
     return;
   }
   btn.style.display = 'flex';
-  btn.disabled = !!state.writing;
+  btn.disabled = !!store.state.writing;
   btn.textContent = `⚡ הכן את "${label}" מראש (אופציונלי)`;
 }
 
-function getReadingContinuationIndex() {
-  if (isReadingScreenActive() && state.currentReadingChapter != null) {
-    return state.currentReadingChapter;
+export function getReadingContinuationIndex() {
+  if (isReadingScreenActive() && store.state.currentReadingChapter != null) {
+    return store.state.currentReadingChapter;
   }
-  return state.lastReadChapter ?? 0;
+  return store.state.lastReadChapter ?? 0;
 }
 
-async function readNextChapter() {
-  if (state.writing) await waitForGeneration();
-  const written = state.chapters.length;
+export async function readNextChapter() {
+  if (store.state.writing) await waitForGeneration();
+  const written = store.state.chapters.length;
   if (written === 0) {
     try {
       await generateChapterAt(0, { openAfter: true });
@@ -292,7 +346,7 @@ async function readNextChapter() {
     openChapter(nextToRead);
     return;
   }
-  if (nextToRead >= state.totalChapters) {
+  if (nextToRead >= store.state.totalChapters) {
     openChapter(Math.min(last, written - 1));
     return;
   }
@@ -303,25 +357,25 @@ async function readNextChapter() {
   }
 }
 
-async function continueFromChapter(currentIdx) {
+export async function continueFromChapter(currentIdx) {
   const nextIdx = currentIdx + 1;
-  if (nextIdx >= state.totalChapters) return;
+  if (nextIdx >= store.state.totalChapters) return;
 
-  if (nextIdx < state.chapters.length) {
+  if (nextIdx < store.state.chapters.length) {
     openChapter(nextIdx);
     return;
   }
 
   showReadingPreparing(true, `מכין את פרק ${nextIdx + 1}...`);
   try {
-    if (state.writing && state.generatingIdx === nextIdx) {
+    if (store.state.writing && store.state.generatingIdx === nextIdx) {
       await waitForGeneration();
-      if (nextIdx < state.chapters.length) openChapter(nextIdx);
-    } else if (!state.writing) {
+      if (nextIdx < store.state.chapters.length) openChapter(nextIdx);
+    } else if (!store.state.writing) {
       await generateChapterAt(nextIdx, { openAfter: true });
     } else {
       await waitForGeneration();
-      if (nextIdx < state.chapters.length) openChapter(nextIdx);
+      if (nextIdx < store.state.chapters.length) openChapter(nextIdx);
       else await generateChapterAt(nextIdx, { openAfter: true });
     }
   } catch(e) {
@@ -331,15 +385,15 @@ async function continueFromChapter(currentIdx) {
   }
 }
 
-function refreshReadingEndActions() {
-  const idx = state.currentReadingChapter;
+export function refreshReadingEndActions() {
+  const idx = store.state.currentReadingChapter;
   if (idx == null) return;
   showReadingPreparing(false);
   renderReadingNav(idx);
 }
 
-async function planChapter(idx) {
-  const book = normalizeBlueprint(state.book);
+export async function planChapter(idx) {
+  const book = normalizeBlueprint(store.state.book);
   const outline = book.chapterOutlines[idx];
   const memoryContext = formatMemoryBookForPrompt();
   const b = book;
@@ -386,8 +440,8 @@ ${priorContext}
   return plan;
 }
 
-async function reviewChapter(text, idx, plan) {
-  const book = state.book;
+export async function reviewChapter(text, idx, plan) {
+  const book = store.state.book;
   const outline = book.chapterOutlines[idx];
   const memoryContext = formatMemoryBookForPrompt();
 
@@ -410,7 +464,7 @@ ${text.slice(-1200)}
 **תחילת הפרק:**
 ${text.substring(0, 3500)}
 
-approved=false אם הפרק נקטע באמצע משפט, חסר סיום, או קצר מ-${MIN_CHAPTER_WORDS} מילים.
+approved=false אם הפרק נקטע באמצע משפט, חסר סיום, או קצר מ-${cfg.MIN_CHAPTER_WORDS} מילים.
 approved=true רק אם אין בעיות severity גבוה, יש סיום מלא, והפרק תואם את התכנון וספר הזיכרון.`;
 
   const { text: reviewRaw } = await callGeminiLiteRaw(prompt, '', 2000, { jsonMode: true });
@@ -420,7 +474,7 @@ approved=true רק אם אין בעיות severity גבוה, יש סיום מל�
   if (!endsWithCompleteSentence(text)) {
     review.issues.push({ type: 'עלילה', description: 'הפרק נקטע באמצע — חסר סיום במשפט שלם', severity: 'גבוה' });
   }
-  if (countWords(text) < MIN_CHAPTER_WORDS) {
+  if (countWords(text) < cfg.MIN_CHAPTER_WORDS) {
     review.issues.push({ type: 'עלילה', description: `הפרק קצר מדי (${countWords(text)} מילים)`, severity: 'גבוה' });
   }
 
@@ -432,8 +486,8 @@ approved=true רק אם אין בעיות severity גבוה, יש סיום מל�
   return review;
 }
 
-async function fixChapter(text, review, idx, plan) {
-  const book = state.book;
+export async function fixChapter(text, review, idx, plan) {
+  const book = store.state.book;
   const outline = book.chapterOutlines[idx];
   const baselineWords = countWords(text);
   const issues = review.issues || [];
@@ -458,7 +512,7 @@ async function fixChapter(text, review, idx, plan) {
     : text;
 
   const style = buildStyleInstructions(getBookProfile());
-  const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך מלא (לפחות ${MIN_CHAPTER_WORDS} מילים) ומעברי [***].
+  const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך מלא (לפחות ${cfg.MIN_CHAPTER_WORDS} מילים) ומעברי [***].
 ${style}
 אם הפרק נקטע — השלם אותו עד סיום מלא עם hook. סיים תמיד במשפט שלם.
 אל תשנה אירועים שלא קשורים לתיקון. החזר את הפרק המלא בלבד — ללא כותרת, ללא הסברים.
@@ -481,8 +535,8 @@ ${chapterBody}`;
   fixed = await extendProse(
     fixed,
     'השלם את הפרק עד סיום מלא במשפט שלם, עם hook לפרק הבא.',
-    MIN_CHAPTER_WORDS,
-    PROSE_EXTEND_MAX_ROUNDS,
+    cfg.MIN_CHAPTER_WORDS,
+    cfg.PROSE_EXTEND_MAX_ROUNDS,
     6144,
     finishReason
   );
@@ -493,9 +547,9 @@ ${chapterBody}`;
   return fixed;
 }
 
-async function updateMemoryBook(chapterText, chapterNum, outline) {
+export async function updateMemoryBook(chapterText, chapterNum, outline) {
   ensureMemoryBook();
-  const current = JSON.stringify(state.memoryBook, null, 2);
+  const current = JSON.stringify(store.state.memoryBook, null, 2);
 
   const prompt = `עדכן את ספר הזיכרון של הספר על בסיס הפרק החדש.
 
@@ -516,7 +570,7 @@ ${chapterText.substring(0, 6000)}
 
 כללים: עדכן קיימים, הוסף חדשים, סמן תעלומות שנפתרו, אל תמחק עובדות חשובות מפרקים קודמים. JSON בלבד.`;
 
-  // Returns the updated memory book (or null); the caller commits it to state
+  // Returns the updated memory book (or null); the caller commits it to store.state
   try {
     const { text } = await callGeminiLiteRaw(prompt, '', 4000, { jsonMode: true });
     const updated = parseJsonFromResponse(text);
@@ -528,7 +582,7 @@ ${chapterText.substring(0, 6000)}
 }
 
 // ===== SUMMARIZE CHAPTER (event log) =====
-async function summarizeChapter(chapterText, chapterNum, outline) {
+export async function summarizeChapter(chapterText, chapterNum, outline) {
   const prompt = `קרא את הפרק הבא וסכם אותו ב-4-6 משפטים קצרים בעברית.
 הסיכום חייב לכלול: אירועים מרכזיים שקרו, החלטות חשובות של דמויות, שינויים במצב העולם, וכל מידע שחיוני להמשך הסיפור.
 כתוב בצורת נקודות: "- [אירוע]". ללא הקדמה, ללא סיכום כללי — רק עובדות.
@@ -545,8 +599,8 @@ ${chapterText.substring(0, 3000)}`;
   }
 }
 
-function buildChapterContext(idx, plan) {
-  const book = state.book;
+export function buildChapterContext(idx, plan) {
+  const book = store.state.book;
   const outline = book.chapterOutlines[idx];
   const memoryContext = formatMemoryBookForPrompt();
 
@@ -554,8 +608,8 @@ function buildChapterContext(idx, plan) {
   if (idx > 0) eventLogContext = getStoryContextForPrompt();
 
   let lastChapterSnippet = '';
-  if (idx > 0 && state.chapters.length > 0) {
-    const last = state.chapters[state.chapters.length - 1];
+  if (idx > 0 && store.state.chapters.length > 0) {
+    const last = store.state.chapters[store.state.chapters.length - 1];
     const lines = last.text.split('\n').filter(l => l.trim()).slice(-4).join(' ');
     lastChapterSnippet = `**שורות הסיום של הפרק הקודם:**\n"${lines.substring(0, 500)}..."`;
   }
@@ -573,7 +627,7 @@ function buildChapterContext(idx, plan) {
   return { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext };
 }
 
-async function continueProse(existing, instruction, maxTokens = 4096) {
+export async function continueProse(existing, instruction, maxTokens = 4096) {
   const prompt = `המשך את הטקסט בעברית ספרותית — בדיוק מהנקודה שבה נעצר, בלי לחזור על פסקאות שכבר נכתבו.
 ${instruction}
 סיים במשפט שלם (נקודה, סימן שאלה או קריאה).
@@ -587,7 +641,7 @@ ${instruction}
   return { text: text.trim(), finishReason };
 }
 
-async function extendProse(text, instruction, minWords, maxRounds = PROSE_EXTEND_MAX_ROUNDS, maxTokens = 4096, initialFinishReason = 'STOP') {
+export async function extendProse(text, instruction, minWords, maxRounds = cfg.PROSE_EXTEND_MAX_ROUNDS, maxTokens = 4096, initialFinishReason = 'STOP') {
   let result = text.trim();
   let finishReason = initialFinishReason || 'STOP';
   for (let r = 0; r < maxRounds && isOutputTruncated(result, finishReason, minWords); r++) {
@@ -599,7 +653,7 @@ async function extendProse(text, instruction, minWords, maxRounds = PROSE_EXTEND
   return result;
 }
 
-async function writeScene(idx, plan, sceneIndex, scene, priorInChapter, ctx, totalScenes) {
+export async function writeScene(idx, plan, sceneIndex, scene, priorInChapter, ctx, totalScenes) {
   const { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext } = ctx;
   const isFirst = sceneIndex === 0;
   const isLast = sceneIndex === totalScenes - 1;
@@ -644,27 +698,27 @@ ${eventLogContext ? eventLogContext + '\n\n' : ''}${isFirst && lastChapterSnippe
   const tailInstr = isLast
     ? 'השלם את הסצנה האחרונה וסיים את הפרק ב-hook.'
     : 'השלם את הסצנה עד סיום טבעי.';
-  text = await extendProse(text, tailInstr, targetMin - 80, PROSE_EXTEND_MAX_ROUNDS, 4096, finishReason);
+  text = await extendProse(text, tailInstr, targetMin - 80, cfg.PROSE_EXTEND_MAX_ROUNDS, 4096, finishReason);
 
   return text;
 }
 
-async function finalizeChapterEnding(fullText, idx, plan, ctx) {
+export async function finalizeChapterEnding(fullText, idx, plan, ctx) {
   if (isChapterTextValid(fullText) && countWords(fullText) >= 1100) return fullText;
 
   const { outline } = ctx;
   let merged = await extendProse(
     fullText,
     `הפרק ${outline.number} ("${outline.title}") נקטע באמצע. כתוב את המשך וסיום הפרק בלבד — עוד 250-450 מילים, עם hook לפרק הבא.`,
-    MIN_CHAPTER_WORDS,
-    PROSE_EXTEND_MAX_ROUNDS,
+    cfg.MIN_CHAPTER_WORDS,
+    cfg.PROSE_EXTEND_MAX_ROUNDS,
     6144
   );
   if (!endsWithCompleteSentence(merged)) {
     merged = await extendProse(
       merged,
       'סיים במשפט אחד חזק וסגור — סיום הפרק.',
-      MIN_CHAPTER_WORDS,
+      cfg.MIN_CHAPTER_WORDS,
       2,
       4096
     );
@@ -672,7 +726,7 @@ async function finalizeChapterEnding(fullText, idx, plan, ctx) {
   return merged;
 }
 
-async function writeChapter(idx, plan, onSceneProgress) {
+export async function writeChapter(idx, plan, onSceneProgress) {
   const ctx = buildChapterContext(idx, plan);
   const { outline } = ctx;
 

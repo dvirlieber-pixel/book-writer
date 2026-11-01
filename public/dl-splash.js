@@ -1,5 +1,5 @@
 /**
- * DLSplash — personal branding splash (vanilla JS; no conflict with app screens).
+ * dl-splash — personal branding splash (vanilla JS; no conflict with app screens).
  * Shows 1.8s, fades out, then calls onComplete so existing init can run.
  */
 (function (global) {

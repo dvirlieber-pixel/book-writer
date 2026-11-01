@@ -1,4 +1,10 @@
 // World dictionary UI (memoryBook)
+import { store } from './store.js';
+import {
+  ensureMemoryBook
+} from './creation-resume.js';
+import { escapeHtml } from './utils.js';
+
 const WORLD_DICT_TABS = [
   { id: 'characters', label: 'דמויות', icon: '👤' },
   { id: 'locations', label: 'מקומות', icon: '📍' },
@@ -9,9 +15,9 @@ const WORLD_DICT_TABS = [
 
 let worldDictActiveTab = 'characters';
 
-function worldDictionaryEntryCount() {
+export function worldDictionaryEntryCount() {
   ensureMemoryBook();
-  const mb = state.memoryBook;
+  const mb = store.state.memoryBook;
   return (mb.characters?.length || 0)
     + (mb.locations?.length || 0)
     + (mb.keyObjects?.length || 0)
@@ -19,13 +25,13 @@ function worldDictionaryEntryCount() {
     + (mb.openMysteries?.length || 0);
 }
 
-function renderWorldDictionaryLibraryEntry() {
+export function renderWorldDictionaryLibraryEntry() {
   const slot = document.getElementById('world-dict-library-slot');
-  if (!slot || !state.book) return;
+  if (!slot || !store.state.book) return;
 
   ensureMemoryBook();
   const count = worldDictionaryEntryCount();
-  const written = state.chapters?.length || 0;
+  const written = store.state.chapters?.length || 0;
 
   slot.innerHTML = '';
   const btn = document.createElement('button');
@@ -42,11 +48,11 @@ function renderWorldDictionaryLibraryEntry() {
   slot.appendChild(btn);
 }
 
-function openWorldDictionary() {
-  if (!state.book) return;
+export function openWorldDictionary() {
+  if (!store.state.book) return;
   ensureMemoryBook();
   const titleEl = document.getElementById('world-dict-book-title');
-  if (titleEl) titleEl.textContent = state.book.title || '';
+  if (titleEl) titleEl.textContent = store.state.book.title || '';
   renderWorldDictionaryTabs();
   renderWorldDictionaryContent();
   document.getElementById('world-dict-backdrop')?.classList.add('open');
@@ -55,25 +61,25 @@ function openWorldDictionary() {
   if (drawer) drawer.setAttribute('aria-hidden', 'false');
 }
 
-function closeWorldDictionary() {
+export function closeWorldDictionary() {
   document.getElementById('world-dict-backdrop')?.classList.remove('open');
   document.getElementById('world-dictionary-drawer')?.classList.remove('open');
   const drawer = document.getElementById('world-dictionary-drawer');
   if (drawer) drawer.setAttribute('aria-hidden', 'true');
 }
 
-function selectWorldDictTab(tabId) {
+export function selectWorldDictTab(tabId) {
   if (!WORLD_DICT_TABS.some(t => t.id === tabId)) return;
   worldDictActiveTab = tabId;
   renderWorldDictionaryTabs();
   renderWorldDictionaryContent();
 }
 
-function renderWorldDictionaryTabs() {
+export function renderWorldDictionaryTabs() {
   const nav = document.getElementById('world-dict-tabs');
   if (!nav) return;
   ensureMemoryBook();
-  const mb = state.memoryBook;
+  const mb = store.state.memoryBook;
 
   nav.innerHTML = '';
   WORLD_DICT_TABS.forEach(tab => {
@@ -90,8 +96,8 @@ function renderWorldDictionaryTabs() {
   });
 }
 
-function renderWorldDictionaryOverview() {
-  const book = state.book;
+export function renderWorldDictionaryOverview() {
+  const book = store.state.book;
   if (!book) return '';
   const parts = [];
   if (book.setting?.trim()) {
@@ -107,12 +113,12 @@ function renderWorldDictionaryOverview() {
   return `<div class="world-dict-overview">${parts.join('')}</div>`;
 }
 
-function renderWorldDictionaryContent() {
+export function renderWorldDictionaryContent() {
   const el = document.getElementById('world-dict-content');
   if (!el) return;
 
   ensureMemoryBook();
-  const mb = state.memoryBook;
+  const mb = store.state.memoryBook;
   const overview = renderWorldDictionaryOverview();
   const items = mb[worldDictActiveTab] || [];
   const tabMeta = WORLD_DICT_TABS.find(t => t.id === worldDictActiveTab);
@@ -171,8 +177,8 @@ function renderWorldDictionaryContent() {
     <div class="world-dict-cards">${body}</div>`;
 }
 
-function worldDictEmptyMessage(tabId) {
-  const written = state.chapters?.length || 0;
+export function worldDictEmptyMessage(tabId) {
+  const written = store.state.chapters?.length || 0;
   if (!written) return 'העולם יתמלא בהמשך — אחרי הפרק הראשון יופיעו כאן פרטים חדשים.';
   const map = {
     characters: 'עדיין אין דמויות מתועדות — יתעדכן עם התקדמות הסיפור.',

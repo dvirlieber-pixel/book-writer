@@ -1,13 +1,45 @@
 // Reading screen & chapter navigation
+import { store } from './store.js';
+import {
+  promptSequelBook
+} from './book-create.js';
+import {
+  exportBookEpub,
+  isBookComplete,
+  sanitizeChapterTitle
+} from './book.js';
+import {
+  continueFromChapter
+} from './chapters.js';
+import {
+  showReadingPreparing
+} from './creation-resume.js';
+import {
+  applyReadingPrefs,
+  updateLandscapeToggleButton,
+  updateWakeLockButton
+} from './prefs-export.js';
+import {
+  showLibrary,
+  showScreen
+} from './screens.js';
+import {
+  recordLastReadingSession
+} from './shelf.js';
+import {
+  save
+} from './storage.js';
+import { escapeHtml } from './utils.js';
+
 // ===== READING NAV =====
-function closeChapterDrawer() {
+export function closeChapterDrawer() {
   document.getElementById('chapter-drawer')?.classList.remove('open');
   document.getElementById('chapter-drawer-backdrop')?.classList.remove('open');
   const drawer = document.getElementById('chapter-drawer');
   if (drawer) drawer.setAttribute('aria-hidden', 'true');
 }
 
-function openChapterDrawer(currentIdx) {
+export function openChapterDrawer(currentIdx) {
   renderChapterDrawerList(currentIdx);
   document.getElementById('chapter-drawer')?.classList.add('open');
   document.getElementById('chapter-drawer-backdrop')?.classList.add('open');
@@ -15,19 +47,19 @@ function openChapterDrawer(currentIdx) {
   if (drawer) drawer.setAttribute('aria-hidden', 'false');
 }
 
-function renderChapterDrawerList(currentIdx) {
+export function renderChapterDrawerList(currentIdx) {
   const list = document.getElementById('chapter-drawer-list');
   if (!list) return;
   list.innerHTML = '';
-  if (!state.chapters.length) {
+  if (!store.state.chapters.length) {
     list.innerHTML = '<p class="ui-faint drawer-empty-msg">אין פרקים עדיין</p>';
     return;
   }
-  state.chapters.forEach((ch, i) => {
+  store.state.chapters.forEach((ch, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'drawer-chapter-item' + (i === currentIdx ? ' current' : '');
-    const outline = state.book?.chapterOutlines?.[i];
+    const outline = store.state.book?.chapterOutlines?.[i];
     btn.innerHTML = `
       <span class="drawer-chapter-num">${ch.number}</span>
       <span style="flex:1">
@@ -47,14 +79,14 @@ function renderChapterDrawerList(currentIdx) {
   });
 }
 
-function renderReadingNav(idx) {
+export function renderReadingNav(idx) {
   const prevBtn = document.getElementById('nav-prev-chapter');
   const nextBtn = document.getElementById('nav-next-chapter');
   const listBtn = document.getElementById('nav-chapter-list');
   if (!prevBtn || !nextBtn || !listBtn) return;
 
-  const written = state.chapters.length;
-  const isLastOutline = idx >= state.totalChapters - 1;
+  const written = store.state.chapters.length;
+  const isLastOutline = idx >= store.state.totalChapters - 1;
 
   prevBtn.disabled = idx <= 0;
   prevBtn.onclick = () => { if (idx > 0) openChapter(idx - 1); };
@@ -70,7 +102,7 @@ function renderReadingNav(idx) {
     nextBtn.disabled = true;
     nextBtn.textContent = 'סוף הספר';
     nextBtn.onclick = null;
-  } else if (state.writing && state.generatingIdx === idx + 1) {
+  } else if (store.state.writing && store.state.generatingIdx === idx + 1) {
     nextBtn.disabled = true;
     nextBtn.textContent = 'בהכנה...';
     nextBtn.onclick = null;
@@ -84,31 +116,31 @@ function renderReadingNav(idx) {
 }
 
 // ===== OPEN CHAPTER =====
-function openChapter(idx) {
-  const chapter = state.chapters[idx];
+export function openChapter(idx) {
+  const chapter = store.state.chapters[idx];
   if (!chapter) return;
 
-  state.currentReadingChapter = idx;
-  state.lastReadChapter = idx;
-  recordLastReadingSession(state.id, idx);
+  store.state.currentReadingChapter = idx;
+  store.state.lastReadChapter = idx;
+  recordLastReadingSession(store.state.id, idx);
   save();
 
   applyReadingPrefs();
-  if ('wakeLock' in navigator && !wakeLock) {
+  if ('wakeLock' in navigator && !store.wakeLock) {
     navigator.wakeLock.request('screen').then(wl => {
-      wakeLock = wl;
-      wl.addEventListener('release', () => { wakeLock = null; updateWakeLockButton(false); });
+      store.wakeLock = wl;
+      wl.addEventListener('release', () => { store.wakeLock = null; updateWakeLockButton(false); });
       updateWakeLockButton(true);
     }).catch(() => {});
   }
 
-  document.getElementById('reading-chapter-label').textContent = `פרק ${chapter.number} מתוך ${state.totalChapters}`;
+  document.getElementById('reading-chapter-label').textContent = `פרק ${chapter.number} מתוך ${store.state.totalChapters}`;
   document.getElementById('reading-chapter-num').textContent = `פרק ${chapter.number}`;
   document.getElementById('reading-chapter-title').textContent =
     sanitizeChapterTitle(chapter.title, chapter.number || idx + 1);
 
   // Epigraph from book outline
-  const outline = state.book?.chapterOutlines?.[idx];
+  const outline = store.state.book?.chapterOutlines?.[idx];
   document.getElementById('reading-chapter-epigraph').textContent =
     outline?.pov ? `נקודת מבט: ${outline.pov}` : '';
 
@@ -134,7 +166,7 @@ function openChapter(idx) {
 
   showReadingPreparing(false);
 
-  const isLast = idx === state.totalChapters - 1;
+  const isLast = idx === store.state.totalChapters - 1;
 
   if (isLast) {
     const doneMsg = document.createElement('div');
@@ -168,15 +200,15 @@ function openChapter(idx) {
   renderReadingNav(idx);
   showScreen('reading-screen');
   updateLandscapeToggleButton();
-  const scrollY = (state.lastReadChapter === idx && state.lastReadScroll) ? state.lastReadScroll : 0;
+  const scrollY = (store.state.lastReadChapter === idx && store.state.lastReadScroll) ? store.state.lastReadScroll : 0;
   window.scrollTo(0, scrollY);
 
   let scrollSaveTimer;
   const onScroll = () => {
     clearTimeout(scrollSaveTimer);
     scrollSaveTimer = setTimeout(() => {
-      if (state.currentReadingChapter === idx) {
-        state.lastReadScroll = window.scrollY;
+      if (store.state.currentReadingChapter === idx) {
+        store.state.lastReadScroll = window.scrollY;
         save();
       }
     }, 300);

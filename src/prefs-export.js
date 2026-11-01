@@ -1,41 +1,66 @@
 // Reading prefs, PWA banners, library import/export
-function getStoryContextForPrompt() {
+import * as cfg from './constants.js';
+import { store } from './store.js';
+import { defaultBookProfile, createEmptyBookState } from './book-model.js';
+import {
+  callGeminiLite
+} from './api.js';
+import {
+  applyBookSnapshot,
+  bookSnapshot,
+  migrateBooksInApp,
+  migrateLegacyTaste,
+  syncWelcomeUIFromProfile
+} from './book.js';
+import {
+  isReadingScreenActive,
+  updateApiKeyStatus,
+  updateWelcomeShelfLink
+} from './creation-resume.js';
+import {
+  renderShelf
+} from './shelf.js';
+import {
+  save
+} from './storage.js';
+
+export function getStoryContextForPrompt() {
   let parts = [];
-  if (state.storySynopsis) parts.push(`**עד כה בסיפור (סיכום):**\n${state.storySynopsis}`);
-  const recent = state.eventLog?.slice(-3) || [];
+  if (store.state.storySynopsis) parts.push(`**עד כה בסיפור (סיכום):**\n${store.state.storySynopsis}`);
+  const recent = store.state.eventLog?.slice(-3) || [];
   if (recent.length) parts.push(`**אירועים בפרקים האחרונים:**\n${recent.join('\n\n')}`);
   return parts.join('\n\n');
 }
 
-async function maybeCompressStorySynopsis() {
-  const n = state.chapters.length;
+export async function maybeCompressStorySynopsis() {
+  const n = store.state.chapters.length;
   if (n < 5 || n % 5 !== 0) return;
   const prompt = `סכם את עלילת הספר עד כה ב-14-18 משפטים בעברית.
 כלול: דמויות מרכזיות, קונפליקט, מטרות, תעלומות פתוחות, ומצב אחרון.
 כתוב בנקודות קצרות. ללא הקדמה.
 
-${state.storySynopsis ? 'סיכום קודם:\n' + state.storySynopsis + '\n\n' : ''}
+${store.state.storySynopsis ? 'סיכום קודם:\n' + store.state.storySynopsis + '\n\n' : ''}
 יומן פרקים:
-${state.eventLog.join('\n\n')}`;
+${store.state.eventLog.join('\n\n')}`;
 
-  const bookState = state;
+  const bookState = store.state;
   try {
     const synopsis = await callGeminiLite(prompt, '', 1500);
     if (synopsis?.trim()) bookState.storySynopsis = synopsis.trim();
   } catch(e) { console.warn('synopsis compress failed', e); }
 }
 
-function lockAppOrientation() {
+export function lockAppOrientation() {
   if (!screen.orientation?.lock) return;
   screen.orientation.lock('portrait-primary').catch(() => {});
 }
 
-function unlockAppOrientation() {
+export function unlockAppOrientation() {
   if (!screen.orientation?.unlock) return;
   try { screen.orientation.unlock(); } catch (e) {}
 }
 
-async function toggleReadingLandscape() {
+export async function toggleReadingLandscape() {
   if (!screen.orientation?.lock) {
     alert('סיבוב מסך אינו נתמך בדפדפן זה');
     return;
@@ -45,10 +70,10 @@ async function toggleReadingLandscape() {
   try {
     if (isLandscape) {
       await screen.orientation.lock('portrait-primary');
-      app.readingPrefs.allowLandscape = false;
+      store.app.readingPrefs.allowLandscape = false;
     } else {
       await screen.orientation.lock('landscape');
-      app.readingPrefs.allowLandscape = true;
+      store.app.readingPrefs.allowLandscape = true;
     }
     save();
     updateLandscapeToggleButton();
@@ -57,7 +82,7 @@ async function toggleReadingLandscape() {
   }
 }
 
-function updateLandscapeToggleButton() {
+export function updateLandscapeToggleButton() {
   const btn = document.getElementById('landscape-toggle-btn');
   if (!btn || !screen.orientation) return;
   const isLandscape = (screen.orientation.type || '').startsWith('landscape');
@@ -66,8 +91,8 @@ function updateLandscapeToggleButton() {
   btn.classList.toggle('landscape-on', isLandscape);
 }
 
-function applyReadingPrefs() {
-  const p = app.readingPrefs || { fontScale: 1, theme: 'dark', immersive: false };
+export function applyReadingPrefs() {
+  const p = store.app.readingPrefs || { fontScale: 1, theme: 'dark', immersive: false };
   document.documentElement.style.setProperty('--read-font-scale', String(p.fontScale || 1));
   const isLight = p.theme === 'light';
   document.body.classList.toggle('theme-light', isLight);
@@ -84,70 +109,70 @@ function applyReadingPrefs() {
   if (imm) imm.classList.toggle('immersive-on', !!p.immersive);
 }
 
-function adjustFontSize(delta) {
-  app.readingPrefs.fontScale = Math.min(1.4, Math.max(0.85, (app.readingPrefs.fontScale || 1) + delta));
+export function adjustFontSize(delta) {
+  store.app.readingPrefs.fontScale = Math.min(1.4, Math.max(0.85, (store.app.readingPrefs.fontScale || 1) + delta));
   applyReadingPrefs();
   save();
 }
 
-function toggleTheme() {
-  app.readingPrefs.theme = app.readingPrefs.theme === 'light' ? 'dark' : 'light';
+export function toggleTheme() {
+  store.app.readingPrefs.theme = store.app.readingPrefs.theme === 'light' ? 'dark' : 'light';
   applyReadingPrefs();
   save();
 }
 
-function toggleReadingImmersive() {
-  app.readingPrefs.immersive = !app.readingPrefs.immersive;
+export function toggleReadingImmersive() {
+  store.app.readingPrefs.immersive = !store.app.readingPrefs.immersive;
   applyReadingPrefs();
   save();
 }
 
-async function toggleWakeLock() {
+export async function toggleWakeLock() {
   try {
     if (!('wakeLock' in navigator)) {
       alert('הדפדפן לא תומך במניעת נעילת מסך');
       return;
     }
-    if (wakeLock) {
-      await wakeLock.release();
-      wakeLock = null;
+    if (store.wakeLock) {
+      await store.wakeLock.release();
+      store.wakeLock = null;
     } else {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => updateWakeLockButton(false));
+      store.wakeLock = await navigator.wakeLock.request('screen');
+      store.wakeLock.addEventListener('release', () => updateWakeLockButton(false));
     }
-    updateWakeLockButton(!!wakeLock);
+    updateWakeLockButton(!!store.wakeLock);
   } catch (e) {
     console.warn('WakeLock', e);
   }
 }
 
-function updateWakeLockButton(on) {
+export function updateWakeLockButton(on) {
   const btn = document.getElementById('wake-toggle-btn');
   if (!btn) return;
   btn.textContent = on ? '💤' : '💡';
   btn.title = on ? 'בטל מניעת נעילה' : 'מנע נעילת מסך';
 }
 
-async function releaseWakeLock() {
-  if (wakeLock) {
-    try { await wakeLock.release(); } catch (e) {}
-    wakeLock = null;
+export async function releaseWakeLock() {
+  if (store.wakeLock) {
+    try { await store.wakeLock.release(); } catch (e) {}
+    store.wakeLock = null;
     updateWakeLockButton(false);
   }
 }
 
-function getTasteProfiles() {
-  if (!app.tasteProfiles?.length) app.tasteProfiles = DEFAULT_TASTE_PROFILES.map(p => ({ ...p }));
-  return app.tasteProfiles;
+export function getTasteProfiles() {
+  if (!store.app.tasteProfiles?.length) store.app.tasteProfiles = cfg.DEFAULT_TASTE_PROFILES.map(p => ({ ...p }));
+  return store.app.tasteProfiles;
 }
 
-function renderTasteProfiles() {
+export function renderTasteProfiles() {
   const wrap = document.getElementById('profile-options');
   if (!wrap) return;
-  const active = app.readingPrefs?.activeProfile || 'classic';
+  const active = store.app.readingPrefs?.activeProfile || 'classic';
   wrap.innerHTML = '';
   getTasteProfiles().forEach(p => {
-    const lenLabel = LENGTH_PRESETS[p.lengthKey || 'medium']?.label || 'בינוני';
+    const lenLabel = cfg.LENGTH_PRESETS[p.lengthKey || 'medium']?.label || 'בינוני';
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'profile-btn' + (p.id === active ? ' selected' : '');
@@ -157,10 +182,10 @@ function renderTasteProfiles() {
   });
 }
 
-function applyTasteProfile(profileId) {
+export function applyTasteProfile(profileId) {
   const p = getTasteProfiles().find(x => x.id === profileId);
   if (!p) return;
-  app.readingPrefs.activeProfile = profileId;
+  store.app.readingPrefs.activeProfile = profileId;
   const legacy = p.taste ? migrateLegacyTaste(p.taste) : null;
   const profile = {
     ...defaultBookProfile(),
@@ -168,22 +193,22 @@ function applyTasteProfile(profileId) {
     tone: p.tone || legacy?.tone || 'classic'
   };
   const lk = p.lengthKey || (p.length >= 45 ? 'long' : p.length >= 25 ? 'medium' : 'short');
-  app.readingPrefs.defaultLengthKey = lk;
-  readingLengthKey = lk;
-  state.totalChapters = LENGTH_PRESETS[lk]?.chapters || 30;
+  store.app.readingPrefs.defaultLengthKey = lk;
+  store.readingLengthKey = lk;
+  store.state.totalChapters = cfg.LENGTH_PRESETS[lk]?.chapters || 30;
   syncWelcomeUIFromProfile(profile, lk);
   renderTasteProfiles();
   save();
 }
 
-function updateOfflineBanner() {
+export function updateOfflineBanner() {
   const banner = document.getElementById('offline-banner');
   const online = navigator.onLine;
   if (banner) banner.style.display = online ? 'none' : 'flex';
   document.body.classList.toggle('has-offline-banner', !online);
 }
 
-function showInstallUi() {
+export function showInstallUi() {
   const banner = document.getElementById('app-install-banner');
   const btn = document.getElementById('pwa-install-btn');
   if (btn) btn.style.display = 'block';
@@ -193,17 +218,17 @@ function showInstallUi() {
   }
 }
 
-function dismissInstallBanner() {
+export function dismissInstallBanner() {
   localStorage.setItem('pwa-install-dismissed', '1');
   const banner = document.getElementById('app-install-banner');
   if (banner) banner.style.display = 'none';
   document.body.classList.remove('has-app-banner');
 }
 
-async function promptPwaInstall() {
-  if (!deferredInstallPrompt) return;
-  const ev = deferredInstallPrompt;
-  deferredInstallPrompt = null;
+export async function promptPwaInstall() {
+  if (!store.deferredInstallPrompt) return;
+  const ev = store.deferredInstallPrompt;
+  store.deferredInstallPrompt = null;
   dismissInstallBanner();
   const btn = document.getElementById('pwa-install-btn');
   if (btn) btn.style.display = 'none';
@@ -211,8 +236,8 @@ async function promptPwaInstall() {
   await ev.userChoice;
 }
 
-function showUpdateBanner(worker) {
-  waitingSwWorker = worker;
+export function showUpdateBanner(worker) {
+  store.waitingSwWorker = worker;
   const banner = document.getElementById('update-banner');
   if (banner) {
     banner.style.display = 'flex';
@@ -220,28 +245,28 @@ function showUpdateBanner(worker) {
   }
 }
 
-function dismissUpdateBanner() {
+export function dismissUpdateBanner() {
   const banner = document.getElementById('update-banner');
   if (banner) banner.style.display = 'none';
   document.body.classList.remove('has-update-banner');
 }
 
-function applyAppUpdate() {
-  if (waitingSwWorker) {
-    waitingSwWorker.postMessage({ type: 'SKIP_WAITING' });
+export function applyAppUpdate() {
+  if (store.waitingSwWorker) {
+    store.waitingSwWorker.postMessage({ type: 'SKIP_WAITING' });
     return;
   }
   window.location.reload();
 }
 
-async function exportLibraryJson() {
-  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+export async function exportLibraryJson() {
+  if (store.state.book && store.state.id) store.app.books[store.state.id] = bookSnapshot();
   const data = {
-    version: EXPORT_FORMAT_VERSION,
+    version: cfg.EXPORT_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
-    readingPrefs: app.readingPrefs,
-    tasteProfiles: app.tasteProfiles,
-    books: app.books || {}
+    readingPrefs: store.app.readingPrefs,
+    tasteProfiles: store.app.tasteProfiles,
+    books: store.app.books || {}
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -252,11 +277,11 @@ async function exportLibraryJson() {
   URL.revokeObjectURL(url);
 }
 
-function onImportLibraryFile(ev) {
+export function onImportLibraryFile(ev) {
   const file = ev.target.files?.[0];
   ev.target.value = '';
   if (!file) return;
-  if (file.size > IMPORT_MAX_BYTES) {
+  if (file.size > cfg.IMPORT_MAX_BYTES) {
     alert('הקובץ גדול מדי (מעל 50MB) — לא ניתן לייבא.');
     return;
   }
@@ -265,31 +290,31 @@ function onImportLibraryFile(ev) {
     try {
       const data = JSON.parse(reader.result);
       if (!data?.books || typeof data.books !== 'object') throw new Error('קובץ לא תקין');
-      if (data.version > EXPORT_FORMAT_VERSION) {
+      if (data.version > cfg.EXPORT_FORMAT_VERSION) {
         throw new Error('הקובץ מגרסה חדשה יותר — עדכן את האפליקציה');
       }
       if (!confirm('לשחזר את המדף מהקובץ? ספרים קיימים יוחלפו.')) return;
-      app.books = data.books;
+      store.app.books = data.books;
       if (data.apiKey) {
         if (confirm('הקובץ מכיל מפתח API ישן. לייבא גם אותו למכשיר זה?')) {
-          app.apiKey = String(data.apiKey).trim();
-          state.apiKey = app.apiKey;
+          store.app.apiKey = String(data.apiKey).trim();
+          store.state.apiKey = store.app.apiKey;
           const keyInput = document.getElementById('api-key-input');
-          if (keyInput) keyInput.value = app.apiKey;
+          if (keyInput) keyInput.value = store.app.apiKey;
           updateApiKeyStatus();
         }
       }
-      if (data.readingPrefs) app.readingPrefs = { ...app.readingPrefs, ...data.readingPrefs };
-      if (data.tasteProfiles?.length) app.tasteProfiles = data.tasteProfiles;
+      if (data.readingPrefs) store.app.readingPrefs = { ...store.app.readingPrefs, ...data.readingPrefs };
+      if (data.tasteProfiles?.length) store.app.tasteProfiles = data.tasteProfiles;
       migrateBooksInApp();
-      const ids = Object.keys(app.books);
+      const ids = Object.keys(store.app.books);
       if (ids.length) {
-        applyBookSnapshot(app.books[ids[ids.length - 1]]);
-        app.currentBookId = state.id;
+        applyBookSnapshot(store.app.books[ids[ids.length - 1]]);
+        store.app.currentBookId = store.state.id;
       } else {
-        state = createEmptyBookState();
-        state.apiKey = app.apiKey;
-        app.currentBookId = null;
+        store.state = createEmptyBookState();
+        store.state.apiKey = store.app.apiKey;
+        store.app.currentBookId = null;
       }
       save();
       applyReadingPrefs();

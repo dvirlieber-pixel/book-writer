@@ -1,5 +1,5 @@
 /**
- * DLWatermark — subtle bottom-left branding (pointer-events: none).
+ * dl-watermark — subtle bottom-left branding (pointer-events: none).
  */
 (function (global) {
   function mountWatermark() {

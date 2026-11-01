@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/build-app-bundle.mjs && vite build",
-    "bundle": "node scripts/build-app-bundle.mjs",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run"
   },

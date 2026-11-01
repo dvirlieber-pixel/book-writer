@@ -1,11 +1,33 @@
 // Library screen rendering
-// ===== RENDER LIBRARY =====
-function renderLibrary() {
-  if (!state.book) return;
+import { store } from './store.js';
+import {
+  genreDisplayLabel,
+  renderBookCompletePanel,
+  renderLibraryActions,
+  shouldRenderChapterInList
+} from './book.js';
+import {
+  readNextChapter,
+  updatePrepareNextButton
+} from './chapters.js';
+import {
+  openChapter
+} from './reading.js';
+import {
+  save
+} from './storage.js';
+import {
+  renderWorldDictionaryLibraryEntry
+} from './world-dictionary.js';
+import { escapeHtml } from './utils.js';
 
-  const book = state.book;
-  const writtenCount = state.chapters.length;
-  const total = state.totalChapters;
+// ===== RENDER LIBRARY =====
+export function renderLibrary() {
+  if (!store.state.book) return;
+
+  const book = store.state.book;
+  const writtenCount = store.state.chapters.length;
+  const total = store.state.totalChapters;
 
   // Header
   document.getElementById('header-book-title').textContent = book.title;
@@ -15,14 +37,14 @@ function renderLibrary() {
   const slot = document.getElementById('book-complete-slot');
   if (slot) slot.innerHTML = '';
 
-  const expanded = !!state.expandChapterList;
+  const expanded = !!store.state.expandChapterList;
   const toggle = document.getElementById('chapter-list-toggle');
   if (toggle) {
     if (total > 12) {
       toggle.style.display = 'inline';
       toggle.textContent = expanded ? 'הצג תמצית' : `הצג את כל ${total} הפרקים`;
       toggle.onclick = () => {
-        state.expandChapterList = !expanded;
+        store.state.expandChapterList = !expanded;
         save();
         renderLibrary();
       };
@@ -31,8 +53,8 @@ function renderLibrary() {
     }
   }
 
-  const seriesBadge = state.sequelIndex > 1
-    ? `<span>📜 ספר ${state.sequelIndex} · ${escapeHtml(state.seriesTitle || book.title)}</span>` : '';
+  const seriesBadge = store.state.sequelIndex > 1
+    ? `<span>📜 ספר ${store.state.sequelIndex} · ${escapeHtml(store.state.seriesTitle || book.title)}</span>` : '';
 
   document.getElementById('book-meta').innerHTML =
     `<span>📚 ${total} פרקים</span><span>✨ ${escapeHtml(genreDisplayLabel())}</span>` +
@@ -58,7 +80,7 @@ function renderLibrary() {
     const btn = document.createElement('button');
     btn.className = `chapter-item ${isWritten ? 'written' : isNext ? 'next-to-write' : 'locked'}`;
 
-    const isPreparing = isNext && state.writing && state.generatingIdx === i;
+    const isPreparing = isNext && store.state.writing && store.state.generatingIdx === i;
     const statusLabel = isWritten ? '<span class="chapter-status done">✓</span>' :
                         isPreparing ? '<span class="chapter-status write">⏳</span>' :
                         isNext ? '<span class="chapter-status write">📖</span>' :
@@ -92,7 +114,7 @@ function renderLibrary() {
       compact.className = 'chapter-item compact-locked';
       compact.innerHTML = `<span class="chapter-hint" style="font-style:normal">🔒 עוד ${hiddenCount} פרקים ייפתחו בהמשך · לחץ להציג הכל</span>`;
       compact.onclick = () => {
-        state.expandChapterList = true;
+        store.state.expandChapterList = true;
         save();
         renderLibrary();
       };
@@ -114,8 +136,8 @@ function renderLibrary() {
     renderBookCompletePanel();
   } else {
     writeBtn.style.display = 'flex';
-    writeBtn.disabled = state.writing;
-    const last = state.lastReadChapter ?? -1;
+    writeBtn.disabled = store.state.writing;
+    const last = store.state.lastReadChapter ?? -1;
     const hasUnread = last + 1 < writtenCount;
     if (writtenCount === 0) writeBtn.textContent = '📖 התחל לקרוא';
     else if (hasUnread) writeBtn.textContent = `↪ המשך מפרק ${last + 2}`;

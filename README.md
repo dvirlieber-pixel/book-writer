@@ -9,26 +9,41 @@ npm install
 npm run dev      # http://localhost:5173
 npm run build    # פלט ב-dist/
 npm run preview  # תצוגה מקומית של הבילד
-npm test         # בדיקות smoke
+npm test         # בדיקות (vitest)
 ```
 
 ## מבנה
 
 | נתיב | תפקיד |
 |------|--------|
-| `index.html` | מעטפת HTML |
+| `index.html` | מעטפת HTML; כפתורים מסומנים ב-`data-action="<שם פונקציה>"` |
 | `styles.css` | עיצוב |
-| `js/` | מקור לוגיקה (legacy modules) |
-| `src/` | ESM — `app.js` נבנה אוטומטית מ-`js/` |
-| `public/` | נכסי PWA: `sw.js`, `manifest`, אייקונים |
+| `src/` | קוד המקור — מודולי ES רגילים, בלי שלב בנייה נוסף |
+| `public/` | נכסי PWA: `sw.js`, `manifest`, אייקונים, `dl-splash.js` / `dl-watermark.js` |
+| `tests/` | בדיקות vitest |
 
-לאחר שינוי ב-`js/`:
+### `src/`
 
-```bash
-npm run bundle   # או npm run build
-```
+| קובץ | תפקיד |
+|------|--------|
+| `main.js` | נקודת כניסה: `bindEvents` + `boot` |
+| `boot.js` | טעינה, אירועי חלון, רישום service worker |
+| `bind-events.js` | מפנה `data-action` לפונקציה המיוצאת מ-`app.js` |
+| `app.js` | מייצא מחדש את כל המודולים (ה-API הציבורי של הכפתורים) |
+| `store.js` | מצב משותף: `store.app` (כל הספרייה) ו-`store.state` (הספר הפתוח) |
+| `constants.js` | קבועים, ז'אנרים, מודלים, מגבלות קצב |
+| `book-model.js` | מבנה ספר ריק ופרופיל ברירת מחדל |
+| `api.js` | קריאות Gemini, תור ומגבלת קצב, ולידציית טקסט |
+| `book-create.js` / `creation-resume.js` | יצירת ספר ותוכנית, המשך יצירה שנקטעה, מפתח API |
+| `chapters.js` | צינור כתיבת פרק: תכנון, סצנות, ביקורת, זיכרון |
+| `book.js` | פרופיל ספר, ניקוי נתונים, snapshot, ייצוא HTML/EPUB |
+| `storage.js` | IndexedDB / localStorage ומיגרציות |
+| `shelf.js` / `library.js` / `reading.js` / `screens.js` | מסכי המדף, הספר, הקריאה והאשף |
+| `world-dictionary.js` | מילון העולם |
+| `prefs-export.js` | העדפות קריאה, PWA, גיבוי JSON |
+| `utils.js` | עזרים משותפים (`escapeHtml`, `showError`, ...) |
 
-קבצים ידניים ב-`src/`: `store.js`, `book-model.js`, `boot.js`, `bind-events.js`.
+מצב משותף תמיד דרך `store.app` / `store.state` — לא משתנים גלובליים. כפתור חדש: הוסף `data-action` ב-HTML וייצא פונקציה באותו שם מאחד המודולים.
 
 ## פריסה
 

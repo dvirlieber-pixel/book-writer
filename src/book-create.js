@@ -1,7 +1,64 @@
 // New book & sequel creation
+import * as cfg from './constants.js';
+import { store } from './store.js';
+import { createEmptyBookState } from './book-model.js';
+import {
+  popGeminiCallPriority,
+  setGeminiCallPriority
+} from './api.js';
+import {
+  applyBookSnapshot,
+  bookSnapshot,
+  buildCreativeBrief,
+  collectWelcomeProfile,
+  deepClone,
+  genreDisplayLabel,
+  getBookProfile,
+  isBookComplete,
+  isSoftSequelGenre,
+  newBookId,
+  normalizeBlueprint,
+  validateWelcomeSelections
+} from './book.js';
+import {
+  clearPendingCreation,
+  emptyMemoryBook,
+  ensureApiKeyVerified,
+  finishNewBookChapterZero,
+  getStoredApiKey,
+  initMemoryBookFromBlueprint,
+  markPendingCreation,
+  migrateMemoryBook,
+  openWelcomeApiSettings,
+  requestBookBlueprint,
+  showApiKeyVerifyError,
+  startLoadingStatusRotation
+} from './creation-resume.js';
+import {
+  renderLibrary
+} from './library.js';
+import {
+  resetWelcomeWizard,
+  setWelcomeWizardStep,
+  showLibrary,
+  showScreen
+} from './screens.js';
+import {
+  clearChapterGenerationQueue,
+  prepareStateForNewStandaloneBook,
+  restoreBookAfterFailedCreation,
+  showShelf
+} from './shelf.js';
+import {
+  save
+} from './storage.js';
+import {
+  showError
+} from './utils.js';
+
 // ===== BOOK CREATION =====
-async function startBookCreation() {
-  if (bookCreationInFlight || state.writing) return;
+export async function startBookCreation() {
+  if (store.bookCreationInFlight || store.state.writing) return;
   if (!navigator.onLine) {
     showError('welcome-error', 'אין חיבור רשת — יצירת ספר חדש דורשת אינטרנט. אפשר לקרוא ספרים שכבר במדף.');
     return;
@@ -29,27 +86,27 @@ async function startBookCreation() {
     return;
   }
 
-  const previousBookId = prepareStateForNewStandaloneBook(profile, readingLengthKey, apiKey);
+  const previousBookId = prepareStateForNewStandaloneBook(profile, store.readingLengthKey, apiKey);
   document.getElementById('create-btn').disabled = true;
   document.getElementById('welcome-error').style.display = 'none';
   showScreen('loading-screen');
   document.getElementById('loading-title').textContent = 'פותח ספר חדש...';
 
   const statusInterval = startLoadingStatusRotation();
-  bookCreationInFlight = true;
+  store.bookCreationInFlight = true;
   setGeminiCallPriority('high');
 
   try {
     const bookData = normalizeBlueprint(await createBookBlueprint());
-    state.book = bookData;
-    state.memoryBook = initMemoryBookFromBlueprint(bookData);
-    state.seriesTitle = bookData.title;
-    app.books[state.id] = bookSnapshot();
+    store.state.book = bookData;
+    store.state.memoryBook = initMemoryBookFromBlueprint(bookData);
+    store.state.seriesTitle = bookData.title;
+    store.app.books[store.state.id] = bookSnapshot();
     markPendingCreation('chapter0', {
       kind: 'standalone',
       previousBookId,
       profile,
-      readingLengthKey: readingLengthKey
+      readingLengthKey: store.readingLengthKey
     });
 
     clearInterval(statusInterval);
@@ -57,18 +114,18 @@ async function startBookCreation() {
     await finishNewBookChapterZero({ kind: 'standalone' });
   } catch(e) {
     clearInterval(statusInterval);
-    restoreBookAfterFailedCreation(state.id, previousBookId, apiKey);
+    restoreBookAfterFailedCreation(store.state.id, previousBookId, apiKey);
     document.getElementById('create-btn').disabled = false;
     showScreen('welcome-screen');
     showError('welcome-error', 'שגיאה ביצירת הספר: ' + e.message);
   } finally {
     popGeminiCallPriority();
-    bookCreationInFlight = false;
+    store.bookCreationInFlight = false;
   }
 }
 
-async function createBookBlueprint() {
-  const n = state.totalChapters;
+export async function createBookBlueprint() {
+  const n = store.state.totalChapters;
   const brief = buildCreativeBrief(getBookProfile());
   const genreLabel = genreDisplayLabel(getBookProfile());
 
@@ -106,8 +163,8 @@ ${brief}
   return requestBookBlueprint(prompt, n);
 }
 
-async function createSequelBlueprint(parent) {
-  const n = state.totalChapters;
+export async function createSequelBlueprint(parent) {
+  const n = store.state.totalChapters;
   const pb = normalizeBlueprint(parent.book);
   const profile = getBookProfile(parent);
   const soft = isSoftSequelGenre(profile);
@@ -119,7 +176,7 @@ async function createSequelBlueprint(parent) {
     ? 'ספר חדש באותו עולם ודמויות — עלילה חדשה, תעלומה או קונפליקט חדש. אל תפתור מחדש את העלילה הקודמת.'
     : 'המשך ישיר של העלילה — לא רימייק.';
 
-  const prompt = `צור תוכנית לספר המשך (ספר ${state.sequelIndex} בסדרה) בעברית, ${n} פרקים.
+  const prompt = `צור תוכנית לספר המשך (ספר ${store.state.sequelIndex} בסדרה) בעברית, ${n} פרקים.
 ${sequelMode}
 
 **ספר קודם:** ${pb.title}
@@ -161,10 +218,10 @@ ${memoryJson}
   return requestBookBlueprint(prompt, n);
 }
 
-function promptSequelBook(sourceId) {
-  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+export function promptSequelBook(sourceId) {
+  if (store.state.book && store.state.id) store.app.books[store.state.id] = bookSnapshot();
 
-  const parent = sourceId ? app.books[sourceId] : bookSnapshot();
+  const parent = sourceId ? store.app.books[sourceId] : bookSnapshot();
   if (!parent?.book) {
     alert('לא נמצא ספר מקור');
     return;
@@ -174,8 +231,8 @@ function promptSequelBook(sourceId) {
     return;
   }
 
-  pendingSequelSourceId = parent.id;
-  pendingSequelLengthKey = parent.readingLengthKey || 'short';
+  store.pendingSequelSourceId = parent.id;
+  store.pendingSequelLengthKey = parent.readingLengthKey || 'short';
 
   const info = document.getElementById('sequel-parent-info');
   if (info) {
@@ -188,7 +245,7 @@ function promptSequelBook(sourceId) {
   }
 
   document.querySelectorAll('#sequel-length-options .length-btn').forEach(b => {
-    b.classList.toggle('selected', b.dataset.length === pendingSequelLengthKey);
+    b.classList.toggle('selected', b.dataset.length === store.pendingSequelLengthKey);
   });
   const err = document.getElementById('sequel-error');
   if (err) err.style.display = 'none';
@@ -196,32 +253,32 @@ function promptSequelBook(sourceId) {
   showScreen('sequel-screen');
 }
 
-function selectSequelLength(btn, key) {
+export function selectSequelLength(btn, key) {
   document.querySelectorAll('#sequel-length-options .length-btn').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
-  pendingSequelLengthKey = key;
+  store.pendingSequelLengthKey = key;
 }
 
-function cancelSequelSetup() {
-  pendingSequelSourceId = null;
-  if (state.book) showLibrary();
+export function cancelSequelSetup() {
+  store.pendingSequelSourceId = null;
+  if (store.state.book) showLibrary();
   else showShelf();
 }
 
-async function confirmSequelBook() {
-  if (bookCreationInFlight || state.writing) return;
-  if (!pendingSequelSourceId) {
+export async function confirmSequelBook() {
+  if (store.bookCreationInFlight || store.state.writing) return;
+  if (!store.pendingSequelSourceId) {
     cancelSequelSetup();
     return;
   }
   const err = document.getElementById('sequel-error');
   if (err) err.style.display = 'none';
-  await startSequelBook(pendingSequelSourceId, pendingSequelLengthKey);
+  await startSequelBook(store.pendingSequelSourceId, store.pendingSequelLengthKey);
 }
 
-async function startSequelBook(sourceId, lengthKey) {
-  if (bookCreationInFlight || state.writing) return;
-  const parent = app.books[sourceId] || bookSnapshot();
+export async function startSequelBook(sourceId, lengthKey) {
+  if (store.bookCreationInFlight || store.state.writing) return;
+  const parent = store.app.books[sourceId] || bookSnapshot();
   if (!parent?.book || !isBookComplete(parent)) {
     showError('sequel-error', 'לא ניתן לפתוח המשך — הספר הקודם לא הושלם');
     return;
@@ -237,30 +294,30 @@ async function startSequelBook(sourceId, lengthKey) {
   const parentMem = deepClone(parent.memoryBook || emptyMemoryBook());
   const parentSynopsis = parent.storySynopsis || parent.eventLog?.join('\n\n') || '';
 
-  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+  if (store.state.book && store.state.id) store.app.books[store.state.id] = bookSnapshot();
   clearChapterGenerationQueue();
 
-  state = createEmptyBookState();
-  state.id = newBookId();
-  state.apiKey = apiKey;
-  state.bookProfile = getBookProfile(parent);
-  const lk = lengthKey || pendingSequelLengthKey || 'short';
-  state.readingLengthKey = lk;
-  state.totalChapters = LENGTH_PRESETS[lk]?.chapters || 15;
-  pendingSequelSourceId = null;
-  state.parentBookId = parent.id;
-  state.seriesTitle = parent.seriesTitle || parent.book.title;
-  state.sequelIndex = (parent.sequelIndex || 1) + 1;
-  state.memoryBook = parentMem;
-  state.storySynopsis = parentSynopsis;
-  state.eventLog = [];
-  state.chapters = [];
-  app.currentBookId = state.id;
+  store.state = createEmptyBookState();
+  store.state.id = newBookId();
+  store.state.apiKey = apiKey;
+  store.state.bookProfile = getBookProfile(parent);
+  const lk = lengthKey || store.pendingSequelLengthKey || 'short';
+  store.state.readingLengthKey = lk;
+  store.state.totalChapters = cfg.LENGTH_PRESETS[lk]?.chapters || 15;
+  store.pendingSequelSourceId = null;
+  store.state.parentBookId = parent.id;
+  store.state.seriesTitle = parent.seriesTitle || parent.book.title;
+  store.state.sequelIndex = (parent.sequelIndex || 1) + 1;
+  store.state.memoryBook = parentMem;
+  store.state.storySynopsis = parentSynopsis;
+  store.state.eventLog = [];
+  store.state.chapters = [];
+  store.app.currentBookId = store.state.id;
   markPendingCreation('blueprint', {
     kind: 'sequel',
     previousBookId: parent.id,
     parentBookId: parent.id,
-    profile: state.bookProfile,
+    profile: store.state.bookProfile,
     readingLengthKey: lk
   });
 
@@ -268,19 +325,19 @@ async function startSequelBook(sourceId, lengthKey) {
   showScreen('loading-screen');
   document.getElementById('loading-title').textContent = 'פותח המשך בעולם הזה...';
   document.getElementById('loading-status').textContent = 'בונה על הסיפור הקודם...';
-  bookCreationInFlight = true;
+  store.bookCreationInFlight = true;
   setGeminiCallPriority('high');
 
   try {
     const bookData = normalizeBlueprint(await createSequelBlueprint(parent));
-    state.book = bookData;
-    state.memoryBook = parentMem;
-    app.books[state.id] = bookSnapshot();
+    store.state.book = bookData;
+    store.state.memoryBook = parentMem;
+    store.app.books[store.state.id] = bookSnapshot();
     markPendingCreation('chapter0', {
       kind: 'sequel',
       previousBookId: parent.id,
       parentBookId: parent.id,
-      profile: state.bookProfile,
+      profile: store.state.bookProfile,
       readingLengthKey: lk
     });
 
@@ -289,14 +346,14 @@ async function startSequelBook(sourceId, lengthKey) {
   } catch(e) {
     document.getElementById('create-btn').disabled = false;
     clearPendingCreation();
-    delete app.books[state.id];
+    delete store.app.books[store.state.id];
     applyBookSnapshot(parent);
-    app.currentBookId = parent.id;
+    store.app.currentBookId = parent.id;
     save();
     showScreen('library-screen');
     showError('library-error', 'שגיאה ביצירת ספר המשך: ' + e.message);
   } finally {
     popGeminiCallPriority();
-    bookCreationInFlight = false;
+    store.bookCreationInFlight = false;
   }
 }

@@ -1,28 +1,63 @@
 // Shelf screen & navigation
-function onShelfFilterChange(v) { shelfFilter = v; renderShelf(); }
-function onShelfSortChange(v) { shelfSort = v; renderShelf(); }
+import * as cfg from './constants.js';
+import { store } from './store.js';
+import { createEmptyBookState } from './book-model.js';
+import {
+  applyBookSnapshot,
+  bookSnapshot,
+  genreDisplayLabel,
+  getBookProfile,
+  isBookComplete,
+  newBookId
+} from './book.js';
+import {
+  clearPendingCreation,
+  emptyMemoryBook,
+  markPendingCreation,
+  updateWelcomeShelfLink
+} from './creation-resume.js';
+import {
+  renderLibrary
+} from './library.js';
+import {
+  openChapter
+} from './reading.js';
+import {
+  resetWelcomeWizard,
+  showScreen
+} from './screens.js';
+import {
+  save
+} from './storage.js';
+import {
+  deleteBookFromShelf,
+  escapeHtml
+} from './utils.js';
 
-function shelfBookMatchesFilter(b) {
+export function onShelfFilterChange(v) { store.shelfFilter = v; renderShelf(); }
+export function onShelfSortChange(v) { store.shelfSort = v; renderShelf(); }
+
+export function shelfBookMatchesFilter(b) {
   const written = b.chapters?.length || 0;
   const total = b.totalChapters || 0;
-  if (shelfFilter === 'complete') return isBookComplete(b);
-  if (shelfFilter === 'reading') return written > 0 && !isBookComplete(b);
-  if (shelfFilter === 'series') return (b.sequelIndex || 1) > 1 || !!b.parentBookId;
+  if (store.shelfFilter === 'complete') return isBookComplete(b);
+  if (store.shelfFilter === 'reading') return written > 0 && !isBookComplete(b);
+  if (store.shelfFilter === 'series') return (b.sequelIndex || 1) > 1 || !!b.parentBookId;
   return true;
 }
 
-function sortShelfIds(ids) {
+export function sortShelfIds(ids) {
   return ids.sort((a, b) => {
-    const ba = app.books[a], bb = app.books[b];
-    if (shelfSort === 'rating') return (bb.rating || 0) - (ba.rating || 0);
-    if (shelfSort === 'title') {
+    const ba = store.app.books[a], bb = store.app.books[b];
+    if (store.shelfSort === 'rating') return (bb.rating || 0) - (ba.rating || 0);
+    if (store.shelfSort === 'title') {
       return (ba.book?.title || '').localeCompare(bb.book?.title || '', 'he');
     }
     return (bb.createdAt || 0) - (ba.createdAt || 0);
   });
 }
 
-function getContinueChapterIndex(b) {
+export function getContinueChapterIndex(b) {
   const written = b.chapters?.length || 0;
   if (!written) return -1;
   const last = b.lastReadChapter ?? 0;
@@ -31,22 +66,22 @@ function getContinueChapterIndex(b) {
   return written - 1;
 }
 
-function shelfCount() {
-  return Object.keys(app.books || {}).length;
+export function shelfCount() {
+  return Object.keys(store.app.books || {}).length;
 }
 
-function renderShelf() {
+export function renderShelf() {
   const grid = document.getElementById('shelf-grid');
   if (!grid) return;
   const filterEl = document.getElementById('shelf-filter');
   const sortEl = document.getElementById('shelf-sort');
-  if (filterEl) filterEl.value = shelfFilter;
-  if (sortEl) sortEl.value = shelfSort;
+  if (filterEl) filterEl.value = store.shelfFilter;
+  if (sortEl) sortEl.value = store.shelfSort;
 
-  let ids = Object.keys(app.books).filter(id => shelfBookMatchesFilter(app.books[id]));
+  let ids = Object.keys(store.app.books).filter(id => shelfBookMatchesFilter(store.app.books[id]));
   ids = sortShelfIds(ids);
 
-  if (!Object.keys(app.books).length) {
+  if (!Object.keys(store.app.books).length) {
     grid.innerHTML = '<div class="shelf-empty">אין ספרים במדף — פתח ספר חדש להתחיל</div>';
     renderShelfContinueFab();
     return;
@@ -58,7 +93,7 @@ function renderShelf() {
   }
   grid.innerHTML = '';
   ids.forEach(id => {
-    const b = app.books[id];
+    const b = store.app.books[id];
     const written = b.chapters?.length || 0;
     const total = b.totalChapters || 0;
     const continueIdx = getContinueChapterIndex(b);
@@ -94,42 +129,42 @@ function renderShelf() {
   renderShelfContinueFab();
 }
 
-function recordLastReadingSession(bookId, chapterIdx) {
+export function recordLastReadingSession(bookId, chapterIdx) {
   if (!bookId || chapterIdx == null || chapterIdx < 0) return;
-  app.lastReadingSession = {
+  store.app.lastReadingSession = {
     bookId,
     chapterIdx,
     updatedAt: Date.now()
   };
 }
 
-function clearLastReadingSessionIfBook(bookId) {
-  if (app.lastReadingSession?.bookId === bookId) {
-    app.lastReadingSession = null;
+export function clearLastReadingSessionIfBook(bookId) {
+  if (store.app.lastReadingSession?.bookId === bookId) {
+    store.app.lastReadingSession = null;
   }
 }
 
-function getLastReadingSessionTarget() {
-  let bookId = app.lastReadingSession?.bookId;
-  let chapterIdx = app.lastReadingSession?.chapterIdx;
+export function getLastReadingSessionTarget() {
+  let bookId = store.app.lastReadingSession?.bookId;
+  let chapterIdx = store.app.lastReadingSession?.chapterIdx;
 
-  if (bookId && !app.books[bookId]) {
-    app.lastReadingSession = null;
+  if (bookId && !store.app.books[bookId]) {
+    store.app.lastReadingSession = null;
     save();
     bookId = null;
   }
 
   if (!bookId) {
-    bookId = app.currentBookId;
-    if (!bookId || !app.books[bookId]) return null;
-    const b = app.books[bookId];
+    bookId = store.app.currentBookId;
+    if (!bookId || !store.app.books[bookId]) return null;
+    const b = store.app.books[bookId];
     const written = b.chapters?.length || 0;
     if (!written) return null;
     chapterIdx = b.lastReadChapter ?? 0;
     if (chapterIdx >= written) chapterIdx = written - 1;
   }
 
-  const book = app.books[bookId];
+  const book = store.app.books[bookId];
   if (!book) return null;
   const written = book.chapters?.length || 0;
   if (!written) return null;
@@ -146,7 +181,7 @@ function getLastReadingSessionTarget() {
   };
 }
 
-function renderShelfContinueFab() {
+export function renderShelfContinueFab() {
   const fab = document.getElementById('shelf-continue-fab');
   const label = document.getElementById('shelf-continue-fab-label');
   const body = document.querySelector('#shelf-screen .shelf-body');
@@ -167,16 +202,16 @@ function renderShelfContinueFab() {
   if (body) body.classList.add('has-continue-fab');
 }
 
-function openBookForReading(id, chapterIdx) {
-  if (state.book && state.id) app.books[state.id] = bookSnapshot();
-  applyBookSnapshot(app.books[id]);
-  app.currentBookId = id;
-  state.apiKey = app.apiKey;
+export function openBookForReading(id, chapterIdx) {
+  if (store.state.book && store.state.id) store.app.books[store.state.id] = bookSnapshot();
+  applyBookSnapshot(store.app.books[id]);
+  store.app.currentBookId = id;
+  store.state.apiKey = store.app.apiKey;
   save();
   openChapter(chapterIdx);
 }
 
-function continueReadingFromFab() {
+export function continueReadingFromFab() {
   const target = getLastReadingSessionTarget();
   if (!target) {
     renderShelfContinueFab();
@@ -185,38 +220,34 @@ function continueReadingFromFab() {
   openBookForReading(target.bookId, target.chapterIdx);
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function continueBookFromShelf(id, ev) {
+export function continueBookFromShelf(id, ev) {
   if (ev) ev.stopPropagation();
-  const b = app.books[id];
+  const b = store.app.books[id];
   const idx = getContinueChapterIndex(b);
   if (idx >= 0) openBookForReading(id, idx);
 }
 
-function openBookFromShelf(id) {
-  if (state.book && state.id) app.books[state.id] = bookSnapshot();
-  applyBookSnapshot(app.books[id]);
-  app.currentBookId = id;
-  state.apiKey = app.apiKey;
+export function openBookFromShelf(id) {
+  if (store.state.book && store.state.id) store.app.books[store.state.id] = bookSnapshot();
+  applyBookSnapshot(store.app.books[id]);
+  store.app.currentBookId = id;
+  store.state.apiKey = store.app.apiKey;
   save();
   renderLibrary();
   showScreen('library-screen');
 }
 
-function showShelf() {
-  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+export function showShelf() {
+  if (store.state.book && store.state.id) store.app.books[store.state.id] = bookSnapshot();
   save();
   renderShelf();
   updateWelcomeShelfLink();
   showScreen('shelf-screen');
 }
 
-function openWelcomeNewBook() {
-  if (state.book && state.id) {
-    app.books[state.id] = bookSnapshot();
+export function openWelcomeNewBook() {
+  if (store.state.book && store.state.id) {
+    store.app.books[store.state.id] = bookSnapshot();
     save();
   }
   showScreen('welcome-screen');
@@ -225,40 +256,40 @@ function openWelcomeNewBook() {
   document.getElementById('create-btn').disabled = false;
 }
 
-function clearChapterGenerationQueue() {
-  while (chapterGenQueue.length) {
-    const job = chapterGenQueue.shift();
+export function clearChapterGenerationQueue() {
+  while (store.chapterGenQueue.length) {
+    const job = store.chapterGenQueue.shift();
     job.rejects.forEach(r => r(new Error('בוטל — נפתח ספר חדש')));
   }
-  chapterGenPumpActive = false;
-  state.writing = false;
-  state.generatingIdx = null;
+  store.chapterGenPumpActive = false;
+  store.state.writing = false;
+  store.state.generatingIdx = null;
 }
 
-/** ספר עצמאי חדש — מאפס state כדי שלא יישארו דמויות/זיכרון מהספר הקודם */
-function prepareStateForNewStandaloneBook(profile, lengthKey, apiKey) {
-  const previousBookId = state.book && state.id ? state.id : (app.currentBookId || null);
-  if (state.book && state.id) app.books[state.id] = bookSnapshot();
+/** ספר עצמאי חדש — מאפס store.state כדי שלא יישארו דמויות/זיכרון מהספר הקודם */
+export function prepareStateForNewStandaloneBook(profile, lengthKey, apiKey) {
+  const previousBookId = store.state.book && store.state.id ? store.state.id : (store.app.currentBookId || null);
+  if (store.state.book && store.state.id) store.app.books[store.state.id] = bookSnapshot();
 
   clearChapterGenerationQueue();
 
   const newId = newBookId();
-  state = createEmptyBookState();
-  state.id = newId;
-  state.apiKey = apiKey;
-  app.apiKey = apiKey;
-  state.bookProfile = profile;
-  state.readingLengthKey = lengthKey;
-  state.totalChapters = LENGTH_PRESETS[lengthKey]?.chapters || 15;
-  state.createdAt = Date.now();
-  state.memoryBook = emptyMemoryBook();
-  state.storySynopsis = '';
-  state.eventLog = [];
-  state.chapters = [];
-  state.parentBookId = null;
-  state.seriesTitle = '';
-  state.sequelIndex = 1;
-  app.currentBookId = state.id;
+  store.state = createEmptyBookState();
+  store.state.id = newId;
+  store.state.apiKey = apiKey;
+  store.app.apiKey = apiKey;
+  store.state.bookProfile = profile;
+  store.state.readingLengthKey = lengthKey;
+  store.state.totalChapters = cfg.LENGTH_PRESETS[lengthKey]?.chapters || 15;
+  store.state.createdAt = Date.now();
+  store.state.memoryBook = emptyMemoryBook();
+  store.state.storySynopsis = '';
+  store.state.eventLog = [];
+  store.state.chapters = [];
+  store.state.parentBookId = null;
+  store.state.seriesTitle = '';
+  store.state.sequelIndex = 1;
+  store.app.currentBookId = store.state.id;
   markPendingCreation('blueprint', {
     kind: 'standalone',
     previousBookId,
@@ -268,21 +299,21 @@ function prepareStateForNewStandaloneBook(profile, lengthKey, apiKey) {
   return previousBookId;
 }
 
-function restoreBookAfterFailedCreation(failedId, previousBookId, apiKey) {
+export function restoreBookAfterFailedCreation(failedId, previousBookId, apiKey) {
   clearPendingCreation();
-  if (failedId) delete app.books[failedId];
-  if (previousBookId && app.books[previousBookId]) {
-    applyBookSnapshot(app.books[previousBookId]);
-    app.currentBookId = previousBookId;
+  if (failedId) delete store.app.books[failedId];
+  if (previousBookId && store.app.books[previousBookId]) {
+    applyBookSnapshot(store.app.books[previousBookId]);
+    store.app.currentBookId = previousBookId;
   } else {
-    const ids = Object.keys(app.books || {});
+    const ids = Object.keys(store.app.books || {});
     if (ids.length) {
       const id = ids[ids.length - 1];
-      applyBookSnapshot(app.books[id]);
-      app.currentBookId = id;
+      applyBookSnapshot(store.app.books[id]);
+      store.app.currentBookId = id;
     } else {
-      state = createEmptyBookState();
-      state.apiKey = apiKey;
+      store.state = createEmptyBookState();
+      store.state.apiKey = apiKey;
     }
   }
   save();
