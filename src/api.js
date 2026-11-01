@@ -197,7 +197,7 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
   const priority = resolveGeminiPriority(options);
   const generationConfig = {
     maxOutputTokens: maxTokens,
-    temperature: options.jsonMode ? 0.7 : 0.9
+    temperature: options.temperature ?? (options.jsonMode ? 0.7 : 0.9)
   };
   if (options.jsonMode) generationConfig.responseMimeType = 'application/json';
 
@@ -324,6 +324,14 @@ export async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retr
 export async function callGemini(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE) {
   const { text } = await callGeminiRaw(prompt, systemPrompt, maxTokens, retries, model);
   return text;
+}
+
+/** Structured (JSON) output from the prose model — for planning steps worth the stronger model */
+export async function callGeminiProseJson(prompt, maxTokens = 8192, options = {}) {
+  return callGeminiRawWithModelChain(
+    cfg.GEMINI_PROSE_MODEL_CHAIN, 'proseModelFallback', cfg.GEMINI_MODEL_PROSE, prompt, '', maxTokens, 4,
+    { ...options, jsonMode: true }
+  );
 }
 
 export async function callGeminiLiteRaw(prompt, systemPrompt = '', maxTokens = 4096, options = {}) {

@@ -30,10 +30,12 @@ import {
   markPendingCreation,
   migrateMemoryBook,
   openWelcomeApiSettings,
-  requestBookBlueprint,
   showApiKeyVerifyError,
   startLoadingStatusRotation
 } from './creation-resume.js';
+import {
+  createBlueprint
+} from './blueprint.js';
 import {
   renderLibrary
 } from './library.js';
@@ -129,38 +131,11 @@ export async function createBookBlueprint() {
   const brief = buildCreativeBrief(getBookProfile());
   const genreLabel = genreDisplayLabel(getBookProfile());
 
-  const prompt = `צור תוכנית לספר בעברית עם ${n} פרקים.
+  const context = `**חשוב:** זהו ספר חדש ועצמאי לחלוטין — לא המשך לספר אחר, לא אותו עולם, לא אותן דמויות. צור עולם, דמויות ועלילה מקוריים לפי הבחירות בלבד.
 
-**חשוב:** זהו ספר חדש ועצמאי לחלוטין — לא המשך לספר אחר, לא אותו עולם, לא אותן דמויות. צור עולם, דמויות ועלילה מקוריים לפי הבחירות בלבד.
+${brief}`;
 
-${brief}
-
-החזר JSON בלבד, ללא markdown, ללא הסברים:
-{
-  "title": "שם הספר",
-  "tagline": "משפט תיאור קצר",
-  "genre": "${genreLabel}",
-  "setting": "הגדרת עולם/זירה (2 משפטים)",
-  "coreRules": "כללי עולם, טכנולוגיה, או מערכת כוח — משפט אחד (רלוונטי לז'אנר)",
-  "centralConflict": "קונפליקט מרכזי במשפט",
-  "theme": "נושא מרכזי",
-  "mainCharacters": [
-    {"name": "שם", "role": "תפקיד", "trait": "תכונה"}
-  ],
-  "chapterOutlines": [
-    {"number": 1, "title": "שם", "summary": "משפט אחד בלבד", "pov": "שם דמות"}
-  ]
-}
-
-כללים קריטיים:
-- chapterOutlines: בדיוק ${n} פרקים
-- chapterOutlines[].title: שם ספרותי קצר בעברית — לא ברכות, לא הודעות מערכת, לא מספרי שגיאה
-- summary: משפט אחד קצר לכל פרק
-- mainCharacters: 3 דמויות
-- התאם לז'אנר — לא כופה פנטזיה אם לא נבחר
-- JSON בלבד`;
-
-  return requestBookBlueprint(prompt, n);
+  return createBlueprint(context, n, genreLabel);
 }
 
 export async function createSequelBlueprint(parent) {
@@ -176,8 +151,8 @@ export async function createSequelBlueprint(parent) {
     ? 'ספר חדש באותו עולם ודמויות — עלילה חדשה, תעלומה או קונפליקט חדש. אל תפתור מחדש את העלילה הקודמת.'
     : 'המשך ישיר של העלילה — לא רימייק.';
 
-  const prompt = `צור תוכנית לספר המשך (ספר ${store.state.sequelIndex} בסדרה) בעברית, ${n} פרקים.
-${sequelMode}
+  const context = `זהו ספר המשך (ספר ${store.state.sequelIndex} בסדרה). ${sequelMode}
+שם הספר חייב להיות חדש. השתמש באותו עולם, כללים ודמויות מספר הזיכרון; דמויות חדשות מותרות.
 
 **ספר קודם:** ${pb.title}
 **תגית:** ${pb.tagline || ''}
@@ -196,26 +171,9 @@ ${memoryJson}
 **סיום הספר הקודם:**
 "...${ending}"
 
-החזר JSON בלבד:
-{
-  "title": "שם הספר החדש (לא אותו שם)",
-  "tagline": "משפט תיאור",
-  "genre": "${genreDisplayLabel(profile)}",
-  "setting": "אותה זירה/עולם בקצרה",
-  "coreRules": "כללי עולם עקביים",
-  "centralConflict": "קונפליקט חדש${soft ? ' — עלילה עצמאית' : ''}",
-  "theme": "נושא",
-  "mainCharacters": [{"name": "שם", "role": "תפקיד", "trait": "תכונה"}],
-  "chapterOutlines": [{"number": 1, "title": "שם", "summary": "משפט אחד", "pov": "שם דמות"}]
-}
+centralConflict: קונפליקט חדש${soft ? ' — עלילה עצמאית' : ''}.`;
 
-כללים:
-- chapterOutlines: בדיוק ${n} פרקים
-- chapterOutlines[].title: שם ספרותי קצר בעברית — לא ברכות, לא הודעות מערכת, לא מספרי שגיאה
-- mainCharacters: 3 דמויות
-- JSON בלבד`;
-
-  return requestBookBlueprint(prompt, n);
+  return createBlueprint(context, n, genreDisplayLabel(profile));
 }
 
 export function promptSequelBook(sourceId) {

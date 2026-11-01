@@ -14,6 +14,7 @@ import {
   save
 } from './storage.js';
 import { escapeHtml } from './utils.js';
+import { styleGuideText } from './blueprint.js';
 
 export function migrateLegacyTaste(taste) {
   const map = {
@@ -135,6 +136,8 @@ export function buildStyleInstructions(profile) {
   if (p.genre && p.genre !== 'other' && cfg.GENRES[p.genre]) {
     lines.push(`ז'אנר: ${cfg.GENRES[p.genre].label} — ${cfg.GENRES[p.genre].blueprint}.`);
   }
+  const bookStyle = styleGuideText(store.state.book);
+  if (bookStyle) lines.push(`**דף הסגנון של הספר (שמור עליו לאורך כל הספר):**\n${bookStyle}`);
   lines.push('אל תחזור על פסקאות שכבר נכתבו. סיים תמיד במשפט שלם.');
   return lines.join('\n');
 }

@@ -21,6 +21,9 @@ import {
   sanitizeChapterTitle
 } from './book.js';
 import {
+  chapterBibleContext
+} from './blueprint.js';
+import {
   ensureMemoryBook,
   formatMemoryBookForPrompt,
   isReadingScreenActive,
@@ -415,12 +418,13 @@ export async function planChapter(idx) {
 **קונפליקט:** ${b.centralConflict || '—'}
 **פרק ${outline.number}:** ${outline.title} — ${outline.summary}
 **נקודת מבט:** ${outline.pov}
+${chapterBibleContext(book, idx)}
 
 ${memoryContext}
 
 ${priorContext}
 
-3-4 סצנות. JSON בלבד.`;
+3-4 סצנות שמממשות את תפקיד הפרק, מובילות למה שמשתנה בסופו ונגמרות ב-hook שלו. JSON בלבד.`;
 
   const { text } = await callGeminiLiteRaw(prompt, '', 2500, { jsonMode: true });
   const plan = parseJsonFromResponse(text);
@@ -450,10 +454,12 @@ export async function reviewChapter(text, idx, plan) {
 }
 
 **פרק ${outline.number}:** ${outline.title}
-**תכנון:**
+${outline.purpose ? `**תפקיד הפרק:** ${outline.purpose}\n` : ''}${outline.turn ? `**מה אמור להשתנה עד סופו:** ${outline.turn}\n` : ''}**תכנון:**
 ${JSON.stringify(plan, null, 2)}
 
 ${memoryContext}
+
+${outline.purpose || outline.turn ? 'פרק שלא מממש את תפקידו או את השינוי המתוכנן — issue מסוג עלילה בחומרה בינוני.\n' : ''}דמות שמופיעה בלשון (זכר/נקבה) שונה מהמסומן בספר הזיכרון — issue מסוג דמות בחומרה בינוני.
 
 **סוף הפרק (חשוב לבדיקת סיום):**
 ${text.slice(-1200)}
@@ -643,7 +649,7 @@ ${chapterTextForAnalysis(chapterText)}
 {
   "summary": ["אירוע", "אירוע"],
   "memoryUpdates": {
-    "characters": [{"name":"","role":"","status":"","notes":""}],
+    "characters": [{"name":"","gender":"זכר|נקבה","role":"","status":"","notes":""}],
     "locations": [{"name":"","description":"","significance":""}],
     "keyObjects": [{"name":"","description":"","owner":"","status":""}],
     "worldRules": [{"rule":"","establishedInChapter":${chapterNum},"notes":""}],
@@ -749,7 +755,9 @@ ${eventLogContext ? eventLogContext + '\n\n' : ''}${isFirst && lastChapterSnippe
 **הנחיות קריטיות:**
 - כתוב רק את הסצנה הזו — בערך ${targetMin}-${targetMax} מילים (לא פחות מ-${targetMin})
 - ${isFirst ? 'פתח באמצע פעולה — בלי הקדמת רקע ארוכה' : 'המשך ישירות מהחלק הקודם של הפרק'}
-- ${isLast ? 'סיים את הסצנה ואת הפרק ב-hook חזק — במשפט סגור וברור' : 'סיים את הסצנה במשפט שלם, לפני המעבר לסצנה הבאה'}
+- ${isLast
+    ? `סיים את הסצנה ואת הפרק ב-hook חזק — במשפט סגור וברור${outline.hook ? `. ה-hook המתוכנן: ${outline.hook}` : ''}`
+    : 'סיים את הסצנה במשפט שלם, לפני המעבר לסצנה הבאה'}
 - אל תכתוב [***] — המעבר יתווסף אוטומטית
 - פרוזה בלבד, ללא כותרות`;
 

@@ -3,7 +3,6 @@ import * as cfg from './constants.js';
 import { store } from './store.js';
 import { defaultBookProfile, createEmptyBookState } from './book-model.js';
 import {
-  callGeminiLiteRaw,
   popGeminiCallPriority,
   setGeminiCallPriority,
   verifyGeminiApiKey
@@ -557,10 +556,6 @@ export function parseJsonFromResponse(raw) {
   }
 }
 
-export function blueprintMaxTokens(chapterCount) {
-  return Math.min(16000, Math.max(6000, 3500 + chapterCount * 200));
-}
-
 export function isBlueprintTruncated(finishReason) {
   return finishReason === 'MAX_TOKENS' || finishReason === 'LENGTH';
 }
@@ -569,12 +564,22 @@ export function normalizeChapterOutlines(book, expectedCount) {
   const defaultPov = book.chapterOutlines?.[0]?.pov?.trim()
     || book.mainCharacters?.[0]?.name
     || 'הגיבור';
-  const outlines = (book.chapterOutlines || []).slice(0, expectedCount).map((ch, i) => ({
-    number: i + 1,
-    title: sanitizeChapterTitle(ch.title, i + 1),
-    summary: ((ch.summary || '').trim() || 'המשך ההרפתקה').slice(0, 400),
-    pov: ((ch.pov || defaultPov).trim() || defaultPov)
-  }));
+  const text = (v, max = 400) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const outlines = (book.chapterOutlines || []).slice(0, expectedCount).map((ch, i) => {
+    const out = {
+      number: i + 1,
+      title: sanitizeChapterTitle(ch.title, i + 1),
+      summary: (text(ch.summary, 600) || 'המשך ההרפתקה'),
+      pov: ((ch.pov || defaultPov).trim() || defaultPov)
+    };
+    // Story-bible outline fields (books created before them simply don't have these)
+    for (const f of ['purpose', 'conflict', 'turn', 'hook']) {
+      if (text(ch[f])) out[f] = text(ch[f]);
+    }
+    const threads = Array.isArray(ch.threads) ? ch.threads.map(t => text(t, 80)).filter(Boolean) : [];
+    if (threads.length) out.threads = threads;
+    return out;
+  });
   while (outlines.length < expectedCount) {
     const n = outlines.length + 1;
     outlines.push({
@@ -587,30 +592,6 @@ export function normalizeChapterOutlines(book, expectedCount) {
   book.chapterOutlines = outlines;
   book.title = sanitizeBookTitle(book.title);
   return book;
-}
-
-export async function requestBookBlueprint(prompt, expectedCount) {
-  const maxTokens = blueprintMaxTokens(expectedCount);
-  let lastErr;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const { text, finishReason } = await callGeminiLiteRaw(prompt, '', maxTokens, { jsonMode: true });
-      if (isBlueprintTruncated(finishReason)) {
-        lastErr = new Error('תוכנית הספר נקטעה באמצע — מנסה שוב');
-        continue;
-      }
-      const book = parseJsonFromResponse(text);
-      if (!book?.title?.trim() || !book.chapterOutlines?.length) {
-        lastErr = new Error('תשובת ה-AI לא כללה JSON תקין — נסה שוב');
-        continue;
-      }
-      return normalizeChapterOutlines(book, expectedCount);
-    } catch (e) {
-      lastErr = e;
-      if (e.message?.includes('הגעת למכסה') || e.modelNotFound) throw e;
-    }
-  }
-  throw lastErr || new Error('לא הצלחנו ליצור תוכנית ספר — נסה שוב');
 }
 
 export function emptyMemoryBook() {
@@ -651,6 +632,7 @@ export function initMemoryBookFromBlueprint(book) {
   return {
     characters: (b.mainCharacters || []).map(c => ({
       name: c.name,
+      ...(c.gender ? { gender: c.gender } : {}),
       role: c.role || '',
       status: 'פעיל',
       notes: c.trait || ''
@@ -673,7 +655,7 @@ export function formatMemoryBookForPrompt() {
   return `**ספר הזיכרון (עובדות מוסכמות — חובה לשמור על עקביות):**
 
 דמויות:
-${fmt(mb.characters, c => `- ${c.name} (${c.role}): ${c.status}. ${c.notes || ''}`)}
+${fmt(mb.characters, c => `- ${c.name}${c.gender ? ` [${c.gender}]` : ''} (${c.role}): ${c.status}. ${c.notes || ''}`)}
 
 מקומות:
 ${fmt(mb.locations, l => `- ${l.name}: ${l.description}. ${l.significance || ''}`)}
