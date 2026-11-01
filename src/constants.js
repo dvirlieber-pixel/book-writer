@@ -84,5 +84,11 @@ export const LOADING_STATUS_MESSAGES = [
 ];
 
 export const MIN_CHAPTER_WORDS = 900;
+/** Thinking tokens allowed per prose call (they count toward maxOutputTokens) */
+export const PROSE_THINKING_BUDGET = 1024;
+/** Output budget for a whole chapter in one call (~2,000 Hebrew words is ~6k tokens) */
+export const CHAPTER_MAX_TOKENS = 16384;
+/** Full-chapter rewrites after a failed review; each costs a prose-model request (free tier: ~20/day) */
+export const MAX_CHAPTER_FIXES = 1;
 export const PROSE_EXTEND_MAX_ROUNDS = 4;
 

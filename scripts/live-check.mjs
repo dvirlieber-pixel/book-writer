@@ -103,10 +103,11 @@ try {
       stage = `ch${num} review`;
       let review = await App.reviewChapter(text, idx, plan);
       const reviews = [review];
-      for (let fix = 0; !review.approved && fix < 2; fix++) {
+      for (let fix = 0; !review.approved && fix < cfg.MAX_CHAPTER_FIXES; fix++) {
         stage = `ch${num} fix`;
         const candidate = await App.fixChapter(text, review, idx, plan);
-        if (App.isChapterTextValid(candidate)) text = candidate;
+        if (candidate === text || !App.isChapterTextValid(candidate)) break;
+        text = candidate;
         stage = `ch${num} review`;
         review = await App.reviewChapter(text, idx, plan);
         reviews.push(review);

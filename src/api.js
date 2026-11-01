@@ -200,6 +200,9 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
     temperature: options.temperature ?? (options.jsonMode ? 0.7 : 0.9)
   };
   if (options.jsonMode) generationConfig.responseMimeType = 'application/json';
+  // Thinking tokens count toward maxOutputTokens: unbounded thinking cut scenes off after a
+  // few hundred words. thinkingBudget is accepted by both the 3.x and 2.5 models in the chain.
+  if (options.thinkingBudget != null) generationConfig.thinkingConfig = { thinkingBudget: options.thinkingBudget };
 
   const apiKey = getStoredApiKey();
   if (!apiKey) throw new Error('נדרש מפתח Gemini — הגדר מפתח בהגדרות');
@@ -256,6 +259,12 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         const msg = err?.error?.message || `שגיאת API: ${response.status}`;
+        if (response.status === 400 && generationConfig.thinkingConfig && /thinking/i.test(msg)) {
+          // Model rejects the thinking setting: retry the same attempt without it
+          delete generationConfig.thinkingConfig;
+          attempt--;
+          continue;
+        }
         if (isQuotaApiError(response.status, msg) && isDailyQuotaError(msg)) throw quotaExceededError(msg);
         if (response.status === 404 || isModelNotFoundError(null, response.status)) {
           const e = new Error(msg);
@@ -312,12 +321,14 @@ export async function callGeminiRawWithModelChain(chain, appKey, primaryModel, p
   throw new Error(`מודלי ${chainLabel} לא זמינים (${tried}) — בדוק ב-Google AI Studio אילו מודלים פעילים בפרויקט.`);
 }
 
+/** Prose text: thinking is capped so the output budget goes to the chapter itself */
 export async function callGeminiRaw(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE) {
+  const options = { thinkingBudget: cfg.PROSE_THINKING_BUDGET };
   if (model !== cfg.GEMINI_MODEL_PROSE) {
-    return callGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model);
+    return callGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model, options);
   }
   return callGeminiRawWithModelChain(
-    cfg.GEMINI_PROSE_MODEL_CHAIN, 'proseModelFallback', cfg.GEMINI_MODEL_PROSE, prompt, systemPrompt, maxTokens, retries
+    cfg.GEMINI_PROSE_MODEL_CHAIN, 'proseModelFallback', cfg.GEMINI_MODEL_PROSE, prompt, systemPrompt, maxTokens, retries, options
   );
 }
 
@@ -384,7 +395,22 @@ export function isOutputTruncated(text, finishReason, minWords) {
   return false;
 }
 
-export function mergeContinuation(existing, continuation) {
+/**
+ * Cuts a text cut off by the token limit back to its last complete sentence, so a
+ * continuation never starts mid-word ("הם י" + "צרו"). Keeps the text as is when that
+ * would drop more than `maxLoss` of it. `paragraphEnd` says whether the cut is at a break.
+ */
+export function trimToLastSentence(text, maxLoss = 0.3) {
+  const t = text.trimEnd();
+  if (endsWithCompleteSentence(t)) return { text: t, trimmed: false, paragraphEnd: true };
+  const re = /[.!?…]["'»”״]?(?=\s|$)/g;
+  let end = -1;
+  for (let m; (m = re.exec(t));) end = m.index + m[0].length;
+  if (end <= 0 || end < t.length * (1 - maxLoss)) return { text: t, trimmed: false, paragraphEnd: false };
+  return { text: t.slice(0, end), trimmed: true, paragraphEnd: /^\s*\n/.test(t.slice(end)) };
+}
+
+export function mergeContinuation(existing, continuation, { sameParagraph = false } = {}) {
   const tail = existing.trimEnd();
   const head = continuation.trimStart();
   if (!head) return tail;
@@ -398,8 +424,8 @@ export function mergeContinuation(existing, continuation) {
     const idx = head.indexOf(tailBit);
     return tail + head.slice(idx + tailBit.length);
   }
-  // Cut mid-sentence (e.g. MAX_TOKENS): keep the sentence in one paragraph
-  return tail + (endsWithCompleteSentence(tail) ? '\n' : ' ') + head;
+  // Cut mid-sentence or mid-paragraph: keep it in one paragraph
+  return tail + (!sameParagraph && endsWithCompleteSentence(tail) ? '\n' : ' ') + head;
 }
 
 /** בדיקה קלילה של מפתח API — countTokens, ללא תור ה-rate limiter */

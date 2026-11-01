@@ -11,7 +11,8 @@ import {
   isOutputTruncated,
   mergeContinuation,
   popGeminiCallPriority,
-  setGeminiCallPriority
+  setGeminiCallPriority,
+  trimToLastSentence
 } from './api.js';
 import {
   buildStyleInstructions,
@@ -156,9 +157,9 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     assertSameBook();
 
     setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum})...`, useLoadingScreen);
-    const onScene = (si, total) => {
+    const onScene = () => {
       assertSameBook();
-      setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum}, חלק ${si + 1}/${total})...`, useLoadingScreen);
+      setPreparingStatus(`כותב את פרק ${chapterNum}...`, useLoadingScreen);
     };
 
     let text = null;
@@ -184,17 +185,17 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     let review = await reviewChapter(text, idx, plan);
     assertSameBook();
     let fixAttempts = 0;
-    while (!review.approved && fixAttempts < 2) {
+    while (!review.approved && fixAttempts < cfg.MAX_CHAPTER_FIXES) {
       setPreparingStatus(`מלטש את פרק ${chapterNum}...`, useLoadingScreen);
       const candidate = await fixChapter(text, review, idx, plan);
       assertSameBook();
-      if (isChapterTextValid(candidate)) {
-        text = candidate;
-        validatedText = candidate;
-      }
+      fixAttempts++;
+      // Nothing changed (or the rewrite was unusable): reviewing the same text again is wasted quota
+      if (candidate === text || !isChapterTextValid(candidate)) break;
+      text = candidate;
+      validatedText = candidate;
       review = await reviewChapter(text, idx, plan);
       assertSameBook();
-      fixAttempts++;
     }
 
     if (!isChapterTextValid(text)) {
@@ -461,11 +462,8 @@ ${memoryContext}
 
 ${outline.purpose || outline.turn ? 'פרק שלא מממש את תפקידו או את השינוי המתוכנן — issue מסוג עלילה בחומרה בינוני.\n' : ''}דמות שמופיעה בלשון (זכר/נקבה) שונה מהמסומן בספר הזיכרון — issue מסוג דמות בחומרה בינוני.
 
-**סוף הפרק (חשוב לבדיקת סיום):**
-${text.slice(-1200)}
-
-**תחילת הפרק:**
-${text.substring(0, 3500)}
+**הפרק המלא:**
+${chapterTextForAnalysis(text)}
 
 approved=false אם הפרק נקטע באמצע משפט, חסר סיום, או קצר מ-${cfg.MIN_CHAPTER_WORDS} מילים.
 approved=true רק אם אין בעיות severity גבוה, יש סיום מלא, והפרק תואם את התכנון וספר הזיכרון.`;
@@ -531,7 +529,7 @@ ${memoryContext}
 **פרק לתיקון:**
 ${chapterBody}`;
 
-  let { text: fixed, finishReason } = await callGeminiRaw(prompt, '', 12288);
+  let { text: fixed, finishReason } = await callGeminiRaw(prompt, '', cfg.CHAPTER_MAX_TOKENS);
   fixed = (fixed || '').trim();
   if (!fixed || fixed.length < 200) return text;
 
@@ -541,7 +539,8 @@ ${chapterBody}`;
     cfg.MIN_CHAPTER_WORDS,
     cfg.PROSE_EXTEND_MAX_ROUNDS,
     6144,
-    finishReason
+    finishReason,
+    chapterContinuationContext(outline, plan)
   );
 
   if (!isChapterTextValid(fixed) || countWords(fixed) < baselineWords * 0.75) {
@@ -676,9 +675,9 @@ export function buildChapterContext(idx, plan) {
 
   let lastChapterSnippet = '';
   if (idx > 0 && store.state.chapters.length > 0) {
+    // Enough of the previous chapter's ending to carry its voice and the exact moment it stopped
     const last = store.state.chapters[store.state.chapters.length - 1];
-    const lines = last.text.split('\n').filter(l => l.trim()).slice(-4).join(' ');
-    lastChapterSnippet = `**שורות הסיום של הפרק הקודם:**\n"${lines.substring(0, 500)}..."`;
+    lastChapterSnippet = `**סוף הפרק הקודם (המשך ממנו בקול זהה):**\n"...${last.text.trimEnd().slice(-1500)}"`;
   }
 
   const b = normalizeBlueprint(book);
@@ -691,85 +690,53 @@ export function buildChapterContext(idx, plan) {
 **הגדרת הספר:** ${b.setting || b.world || '—'}
 **קונפליקט מרכזי:** ${b.centralConflict || '—'}`;
 
-  return { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext };
+  return {
+    book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext,
+    continuationContext: chapterContinuationContext(outline, plan)
+  };
 }
 
-export async function continueProse(existing, instruction, maxTokens = 4096) {
+/** What a continuation must stay faithful to: the chapter's plan and its planned ending */
+export function chapterContinuationContext(outline, plan) {
+  const scenes = (plan?.scenes || [])
+    .map((s, i) => `${i + 1}. ${s.beat || s.goal || ''}`.trim())
+    .filter(l => l.length > 3);
+  return [
+    `**הפרק:** ${outline.number} — ${outline.title}: ${outline.summary}`,
+    scenes.length ? `**הסצנות המתוכננות:**\n${scenes.join('\n')}` : '',
+    outline.turn ? `**מה משתנה עד סוף הפרק:** ${outline.turn}` : '',
+    outline.hook ? `**הסיום המתוכנן (hook):** ${outline.hook}` : ''
+  ].filter(Boolean).join('\n');
+}
+
+export async function continueProse(existing, instruction, maxTokens = 4096, context = '') {
+  const style = buildStyleInstructions(getBookProfile());
   const prompt = `המשך את הטקסט בעברית ספרותית — בדיוק מהנקודה שבה נעצר, בלי לחזור על פסקאות שכבר נכתבו.
 ${instruction}
-סיים במשפט שלם (נקודה, סימן שאלה או קריאה).
+${context ? `\nהישאר נאמן לתכנון: אל תמציא תפניות, גילויים או שינויים בדמויות שאינם בו.\n${context}\n` : ''}
+${style}
 
 **סוף הטקסט עד כה:**
-"...${existing.trimEnd().slice(-2000)}"
+"...${existing.trimEnd().slice(-2500)}"
 
-כתוב המשך בלבד — פרוזה, ללא כותרות והסברים.`;
+כתוב המשך בלבד — פרוזה, ללא כותרות והסברים. סיים במשפט שלם.`;
 
   const { text, finishReason } = await callGeminiRaw(prompt, '', maxTokens);
   return { text: text.trim(), finishReason };
 }
 
-export async function extendProse(text, instruction, minWords, maxRounds = cfg.PROSE_EXTEND_MAX_ROUNDS, maxTokens = 4096, initialFinishReason = 'STOP') {
+export async function extendProse(text, instruction, minWords, maxRounds = cfg.PROSE_EXTEND_MAX_ROUNDS, maxTokens = 4096, initialFinishReason = 'STOP', context = '') {
   let result = text.trim();
   let finishReason = initialFinishReason || 'STOP';
   for (let r = 0; r < maxRounds && isOutputTruncated(result, finishReason, minWords); r++) {
-    const cont = await continueProse(result, instruction, maxTokens);
+    // Continue from the last complete sentence, never from a half word
+    const cut = trimToLastSentence(result);
+    const cont = await continueProse(cut.text, instruction, maxTokens, context);
     if (!cont.text) break;
-    result = mergeContinuation(result, cont.text);
+    result = mergeContinuation(cut.text, cont.text, { sameParagraph: cut.trimmed && !cut.paragraphEnd });
     finishReason = cont.finishReason;
   }
   return result;
-}
-
-export async function writeScene(idx, plan, sceneIndex, scene, priorInChapter, ctx, totalScenes) {
-  const { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext } = ctx;
-  const isFirst = sceneIndex === 0;
-  const isLast = sceneIndex === totalScenes - 1;
-  const targetMin = isLast ? 500 : 400;
-  const targetMax = isLast ? 700 : 600;
-
-  const bridge = priorInChapter
-    ? `**מה שכבר קרה בפרק הזה (אל תחזור על זה):**\n"...${priorInChapter.trimEnd().slice(-800)}..."\n\n`
-    : '';
-
-  const style = buildStyleInstructions(getBookProfile());
-  const wordTarget = `⚠️ הנחיית אורך קריטית: כתוב בדיוק ${targetMin}–${targetMax} מילים לסצנה זו. ` +
-  `כשאתה מתקרב ל-${targetMax} מילים — סיים את הסצנה באופן טבעי במשפט שלם. ` +
-  `אל תיקטע באמצע משפט או דיאלוג.`;
-
-const prompt = `${wordTarget}
-
-${style}
-
-**ספר:** ${book.title} | **פרק ${outline.number}:** ${outline.title} | **POV:** ${outline.pov}
-
-${memoryContext}
-
-${planContext}
-
-${eventLogContext ? eventLogContext + '\n\n' : ''}${isFirst && lastChapterSnippet ? lastChapterSnippet + '\n\n' : ''}${bridge}**הסצנה הנוכחית (${sceneIndex + 1} מתוך ${totalScenes}):**
-מקום: ${scene.location || 'לפי ההקשר'}
-מטרה: ${scene.goal}
-מה קורה: ${scene.beat}
-דמויות: ${(scene.characters || []).join(', ') || outline.pov}
-
-**הנחיות קריטיות:**
-- כתוב רק את הסצנה הזו — בערך ${targetMin}-${targetMax} מילים (לא פחות מ-${targetMin})
-- ${isFirst ? 'פתח באמצע פעולה — בלי הקדמת רקע ארוכה' : 'המשך ישירות מהחלק הקודם של הפרק'}
-- ${isLast
-    ? `סיים את הסצנה ואת הפרק ב-hook חזק — במשפט סגור וברור${outline.hook ? `. ה-hook המתוכנן: ${outline.hook}` : ''}`
-    : 'סיים את הסצנה במשפט שלם, לפני המעבר לסצנה הבאה'}
-- אל תכתוב [***] — המעבר יתווסף אוטומטית
-- פרוזה בלבד, ללא כותרות`;
-
-  let { text, finishReason } = await callGeminiRaw(prompt, '', 8192);
-  text = text.trim();
-
-  const tailInstr = isLast
-    ? 'השלם את הסצנה האחרונה וסיים את הפרק ב-hook.'
-    : 'השלם את הסצנה עד סיום טבעי.';
-  text = await extendProse(text, tailInstr, targetMin - 80, cfg.PROSE_EXTEND_MAX_ROUNDS, 4096, finishReason);
-
-  return text;
 }
 
 export async function finalizeChapterEnding(fullText, idx, plan, ctx) {
@@ -781,7 +748,9 @@ export async function finalizeChapterEnding(fullText, idx, plan, ctx) {
     `הפרק ${outline.number} ("${outline.title}") נקטע באמצע. כתוב את המשך וסיום הפרק בלבד — עוד 250-450 מילים, עם hook לפרק הבא.`,
     cfg.MIN_CHAPTER_WORDS,
     cfg.PROSE_EXTEND_MAX_ROUNDS,
-    6144
+    6144,
+    'STOP',
+    ctx.continuationContext
   );
   if (!endsWithCompleteSentence(merged)) {
     merged = await extendProse(
@@ -789,32 +758,62 @@ export async function finalizeChapterEnding(fullText, idx, plan, ctx) {
       'סיים במשפט אחד חזק וסגור — סיום הפרק.',
       cfg.MIN_CHAPTER_WORDS,
       2,
-      4096
+      4096,
+      'STOP',
+      ctx.continuationContext
     );
   }
   return merged;
 }
 
+/**
+ * Writes the whole chapter in one prose call from the scene plan: one seamless text, and a
+ * single request against the prose model's small daily quota (it used to be one per scene
+ * plus continuations). Continuations only run if the reply still comes back cut off.
+ */
 export async function writeChapter(idx, plan, onSceneProgress) {
   const ctx = buildChapterContext(idx, plan);
-  const { outline } = ctx;
+  const { book, outline, memoryContext, eventLogContext, lastChapterSnippet, planContext } = ctx;
 
   const scenes = plan.scenes?.length
     ? plan.scenes
     : [{ goal: outline.summary, beat: outline.summary, location: '', characters: [outline.pov] }];
+  const sceneLines = scenes.map((s, i) =>
+    `${i + 1}. ${s.location ? `[${s.location}] ` : ''}${s.goal || ''}${s.beat ? ` — ${s.beat}` : ''}` +
+    ` (דמויות: ${(s.characters || []).join(', ') || outline.pov})`).join('\n');
 
-  const parts = [];
-  let priorInChapter = '';
+  const style = buildStyleInstructions(getBookProfile());
+  const prompt = `כתוב את פרק ${outline.number} המלא של הספר.
 
-  for (let i = 0; i < scenes.length; i++) {
-    if (onSceneProgress) onSceneProgress(i, scenes.length);
-    const sceneText = await writeScene(idx, plan, i, scenes[i], priorInChapter, ctx, scenes.length);
-    if (i > 0) parts.push('[***]');
-    parts.push(sceneText);
-    priorInChapter = parts.join('\n\n');
-  }
+${style}
 
-  let full = parts.join('\n\n').trim();
+**ספר:** ${book.title} | **פרק ${outline.number}:** ${outline.title} | **POV:** ${outline.pov}
+
+${memoryContext}
+
+${planContext}
+
+${eventLogContext ? eventLogContext + '\n\n' : ''}${lastChapterSnippet ? lastChapterSnippet + '\n\n' : ''}**הסצנות של הפרק, לפי הסדר:**
+${sceneLines}
+
+**הנחיות:**
+- פרק שלם ורציף של 1,500-2,200 מילים שמכסה את כל הסצנות לפי הסדר.
+- ${idx === 0 ? 'פתח באמצע פעולה — בלי הקדמת רקע ארוכה.' : 'המשך באופן טבעי מהרגע שבו נגמר הפרק הקודם.'}
+- מעבר בין סצנות: שורה נפרדת עם [***] רק כשיש קפיצה בזמן או במקום; אחרת מעבר רציף בפרוזה.
+- סיים את הפרק ב-hook חזק במשפט סגור${outline.hook ? `. ה-hook המתוכנן: ${outline.hook}` : ''}.
+- פרוזה בלבד, ללא כותרות.`;
+
+  if (onSceneProgress) onSceneProgress(0, 1);
+  const { text, finishReason } = await callGeminiRaw(prompt, '', cfg.CHAPTER_MAX_TOKENS);
+  let full = await extendProse(
+    text,
+    'השלם את הפרק לפי התכנון וסיים אותו ב-hook.',
+    cfg.MIN_CHAPTER_WORDS,
+    cfg.PROSE_EXTEND_MAX_ROUNDS,
+    6144,
+    finishReason,
+    ctx.continuationContext
+  );
   full = await finalizeChapterEnding(full, idx, plan, ctx);
   assertChapterTextValid(full);
   return full;
