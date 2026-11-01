@@ -1,3 +1,7 @@
 node_modules/
 dist/
 .DS_Store
+
+# Local secrets (Gemini key for scripts/live-check.mjs) and its output
+.env*
+live-runs/
