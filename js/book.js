@@ -303,7 +303,7 @@ function escapeXml(s) {
 
 function proseToXhtml(text) {
   return text.split(/\n+/).map(p => p.trim()).filter(Boolean).map(p => {
-    if (p === '[***]' || p === '* * *') return '<hr/>';
+    if (p === '[***]' || p === '***' || p === '* * *') return '<hr/>';
     return `<p>${escapeXml(p)}</p>`;
   }).join('\n    ');
 }

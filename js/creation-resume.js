@@ -325,14 +325,14 @@ function updateApiKeyVerifyUI(forcedState) {
   if (!indicator) return;
 
   const key = getStoredApiKey();
-  let state = forcedState;
-  if (!state) {
-    if (apiKeyVerifyInFlight) state = 'checking';
-    else if (apiKeyVerifyCache.key === key) state = apiKeyVerifyCache.state;
-    else state = 'idle';
+  let verifyState = forcedState;
+  if (!verifyState) {
+    if (apiKeyVerifyInFlight) verifyState = 'checking';
+    else if (apiKeyVerifyCache.key === key) verifyState = apiKeyVerifyCache.state;
+    else verifyState = 'idle';
   }
 
-  if (state === 'idle' || !key) {
+  if (verifyState === 'idle' || !key) {
     indicator.hidden = true;
     indicator.className = 'api-key-verify-indicator';
     indicator.textContent = '';
@@ -341,15 +341,15 @@ function updateApiKeyVerifyUI(forcedState) {
   }
 
   indicator.hidden = false;
-  indicator.className = `api-key-verify-indicator is-${state}`;
+  indicator.className = `api-key-verify-indicator is-${verifyState}`;
 
-  if (state === 'checking') {
+  if (verifyState === 'checking') {
     indicator.innerHTML = '<span class="api-verify-spinner" aria-hidden="true"></span><span>בודק מפתח...</span>';
     if (btn) btn.disabled = true;
-  } else if (state === 'valid') {
+  } else if (verifyState === 'valid') {
     indicator.innerHTML = '<span class="api-verify-icon valid" aria-hidden="true">✓</span><span>מפתח תקין</span>';
     if (btn) btn.disabled = false;
-  } else if (state === 'invalid') {
+  } else if (verifyState === 'invalid') {
     indicator.innerHTML = '<span class="api-verify-icon invalid" aria-hidden="true">✗</span><span>מפתח לא תקין</span>';
     if (btn) btn.disabled = false;
   }

@@ -18,9 +18,10 @@ ${state.storySynopsis ? 'סיכום קודם:\n' + state.storySynopsis + '\n\n' 
 יומן פרקים:
 ${state.eventLog.join('\n\n')}`;
 
+  const bookState = state;
   try {
     const synopsis = await callGeminiLite(prompt, '', 1500);
-    if (synopsis?.trim()) state.storySynopsis = synopsis.trim();
+    if (synopsis?.trim()) bookState.storySynopsis = synopsis.trim();
   } catch(e) { console.warn('synopsis compress failed', e); }
 }
 

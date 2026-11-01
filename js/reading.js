@@ -119,7 +119,7 @@ function openChapter(idx) {
     .map(p => p.trim())
     .filter(p => p.length > 0)
     .map(p => {
-      if (p === '***' || p === '* * *') {
+      if (p === '[***]' || p === '***' || p === '* * *') {
         return '<div class="chapter-divider">✦ ✦ ✦</div>';
       }
       return `<p>${escapeHtml(p)}</p>`;

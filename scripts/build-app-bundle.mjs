@@ -3,6 +3,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -50,9 +51,10 @@ function ns(s, names, prefix) {
       new RegExp(`\\.\\.\\.\\s*\\b${name}\\b`, 'g'),
       `...${prefix}.${name}`
     );
-    // Skip object literal keys (e.g. readingLengthKey: 'short')
+    // Skip property access, object literal keys (readingLengthKey: 'short') and
+    // string fragments ('wakeLock' in navigator, 'app-install-banner')
     out = out.replace(
-      new RegExp(`(?<![.${prefix}])\\b${name}\\b(?!\\s*:)`, 'g'),
+      new RegExp(`(?<![.\\w$'"\`#-])\\b${name}\\b(?![-'"\`]|\\s*:)`, 'g'),
       `${prefix}.${name}`
     );
   }
@@ -138,6 +140,14 @@ ${uniqueExports.map(e => `  ${e}`).join(',\n')}
 `;
 
 fs.writeFileSync(path.join(root, 'src', 'app.js'), appJs);
+
+// Fail fast if the rewrite produced invalid JS (e.g. a local named like a store field)
+const check = spawnSync(process.execPath, ['--check', path.join(root, 'src', 'app.js')], { encoding: 'utf8' });
+if (check.status !== 0) {
+  console.error(check.stderr);
+  console.error('src/app.js failed to parse — rename the conflicting local in js/ (store/cfg names are reserved).');
+  process.exit(1);
+}
 
 // main.js
 fs.writeFileSync(path.join(root, 'src', 'main.js'), `import '../styles.css';

@@ -2,14 +2,15 @@
 // ===== CHAPTER PIPELINE (מאחורי הקלעים) =====
 function requestChapterGeneration(idx, opts = {}) {
   return new Promise((resolve, reject) => {
-    const dup = chapterGenQueue.find(j => j.idx === idx);
+    const bookId = state.id;
+    const dup = chapterGenQueue.find(j => j.idx === idx && j.bookId === bookId);
     if (dup) {
       dup.resolves.push(resolve);
       dup.rejects.push(reject);
       pumpChapterGenQueue();
       return;
     }
-    chapterGenQueue.push({ idx, opts, resolves: [resolve], rejects: [reject] });
+    chapterGenQueue.push({ idx, bookId, opts, resolves: [resolve], rejects: [reject] });
     pumpChapterGenQueue();
   });
 }
@@ -20,6 +21,12 @@ async function pumpChapterGenQueue() {
   try {
     while (chapterGenQueue.length) {
       const job = chapterGenQueue[0];
+      // Job queued for a book that is no longer open — drop it quietly
+      if (job.bookId !== state.id) {
+        job.resolves.forEach(r => r());
+        chapterGenQueue.shift();
+        continue;
+      }
       if (state.writing && state.generatingIdx !== job.idx) {
         await waitForGeneration();
         continue;
@@ -63,6 +70,16 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   }
 
   ensureMemoryBook();
+  // applyBookSnapshot replaces `state` wholesale; if that happens mid-generation,
+  // stop before writing anything into the newly opened book.
+  const genState = state;
+  const assertSameBook = () => {
+    if (state !== genState) {
+      const err = new Error('book switched during generation');
+      err.bookSwitched = true;
+      throw err;
+    }
+  };
   setGeminiCallPriority(background ? 'low' : 'high');
   state.writing = true;
   state.generatingIdx = idx;
@@ -80,9 +97,11 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   try {
     setPreparingStatus(`מכין את פרק ${chapterNum}...`, useLoadingScreen);
     const plan = await planChapter(idx);
+    assertSameBook();
 
     setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum})...`, useLoadingScreen);
     const onScene = (si, total) => {
+      assertSameBook();
       setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum}, חלק ${si + 1}/${total})...`, useLoadingScreen);
     };
 
@@ -93,6 +112,7 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
         text = await writeChapter(idx, plan, onScene);
         break;
       } catch (e) {
+        assertSameBook();
         lastWriteErr = e;
         if (writeAttempt < 1) {
           setPreparingStatus(`מנסה שוב לכתוב את פרק ${chapterNum}...`, useLoadingScreen);
@@ -101,19 +121,23 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
     }
     if (!text) throw lastWriteErr;
 
+    assertSameBook();
     let validatedText = text;
 
     setPreparingStatus(`מוודא שהפרק ${chapterNum} מוכן...`, useLoadingScreen);
     let review = await reviewChapter(text, idx, plan);
+    assertSameBook();
     let fixAttempts = 0;
     while (!review.approved && fixAttempts < 2) {
       setPreparingStatus(`מלטש את פרק ${chapterNum}...`, useLoadingScreen);
       const candidate = await fixChapter(text, review, idx, plan);
+      assertSameBook();
       if (isChapterTextValid(candidate)) {
         text = candidate;
         validatedText = candidate;
       }
       review = await reviewChapter(text, idx, plan);
+      assertSameBook();
       fixAttempts++;
     }
 
@@ -125,14 +149,20 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
       }
     }
 
-    state.chapters.push({ title: sanitizeChapterTitle(outline.title, chapterNum), text, number: chapterNum });
-
     setPreparingStatus('כמעט מוכן...', useLoadingScreen);
-    await updateMemoryBook(text, chapterNum, outline);
+    const memoryBook = await updateMemoryBook(text, chapterNum, outline);
+    assertSameBook();
     const summary = await summarizeChapter(text, chapterNum, outline);
+    assertSameBook();
+
+    // Commit chapter, memory and event log together (no await in between)
+    state.chapters.push({ title: sanitizeChapterTitle(outline.title, chapterNum), text, number: chapterNum });
+    if (memoryBook) state.memoryBook = memoryBook;
     if (!state.eventLog) state.eventLog = [];
     state.eventLog.push(`פרק ${chapterNum} (${outline.title}):\n${summary}`);
+    save();
     await maybeCompressStorySynopsis();
+    assertSameBook();
 
     state.writing = false;
     state.generatingIdx = null;
@@ -150,6 +180,11 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
 
   } catch(e) {
     popGeminiCallPriority();
+    if (e?.bookSwitched) {
+      // The open book is a different one now — leave its state and UI alone
+      console.info(`chapter ${chapterNum} generation dropped: book switched`);
+      return;
+    }
     state.writing = false;
     state.generatingIdx = null;
     save();
@@ -481,13 +516,15 @@ ${chapterText.substring(0, 6000)}
 
 כללים: עדכן קיימים, הוסף חדשים, סמן תעלומות שנפתרו, אל תמחק עובדות חשובות מפרקים קודמים. JSON בלבד.`;
 
+  // Returns the updated memory book (or null); the caller commits it to state
   try {
     const { text } = await callGeminiLiteRaw(prompt, '', 4000, { jsonMode: true });
     const updated = parseJsonFromResponse(text);
-    if (updated?.characters) state.memoryBook = migrateMemoryBook(updated);
+    if (updated?.characters) return migrateMemoryBook(updated);
   } catch(e) {
     console.warn('updateMemoryBook failed:', e);
   }
+  return null;
 }
 
 // ===== SUMMARIZE CHAPTER (event log) =====

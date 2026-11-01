@@ -285,7 +285,7 @@ function escapeXml(s) {
 
 function proseToXhtml(text) {
   return text.split(/\n+/).map(p => p.trim()).filter(Boolean).map(p => {
-    if (p === '[***]' || p === '* * *') return '<hr/>';
+    if (p === '[***]' || p === '***' || p === '* * *') return '<hr/>';
     return `<p>${escapeXml(p)}</p>`;
   }).join('\n    ');
 }
@@ -730,9 +730,10 @@ ${store.state.storySynopsis ? 'סיכום קודם:\n' + store.state.storySynops
 יומן פרקים:
 ${store.state.eventLog.join('\n\n')}`;
 
+  const bookState = store.state;
   try {
     const synopsis = await callGeminiLite(prompt, '', 1500);
-    if (synopsis?.trim()) store.state.storySynopsis = synopsis.trim();
+    if (synopsis?.trim()) bookState.storySynopsis = synopsis.trim();
   } catch(e) { console.warn('synopsis compress failed', e); }
 }
 
@@ -815,7 +816,7 @@ function toggleReadingImmersive() {
 
 async function toggleWakeLock() {
   try {
-    if (!('store.wakeLock' in navigator)) {
+    if (!('wakeLock' in navigator)) {
       alert('הדפדפן לא תומך במניעת נעילת מסך');
       return;
     }
@@ -895,20 +896,20 @@ function updateOfflineBanner() {
 }
 
 function showInstallUi() {
-  const banner = document.getElementById('store.app-install-banner');
+  const banner = document.getElementById('app-install-banner');
   const btn = document.getElementById('pwa-install-btn');
   if (btn) btn.style.display = 'block';
   if (banner && !localStorage.getItem('pwa-install-dismissed')) {
     banner.style.display = 'flex';
-    document.body.classList.add('has-store.app-banner');
+    document.body.classList.add('has-app-banner');
   }
 }
 
 function dismissInstallBanner() {
   localStorage.setItem('pwa-install-dismissed', '1');
-  const banner = document.getElementById('store.app-install-banner');
+  const banner = document.getElementById('app-install-banner');
   if (banner) banner.style.display = 'none';
-  document.body.classList.remove('has-store.app-banner');
+  document.body.classList.remove('has-app-banner');
 }
 
 async function promptPwaInstall() {
@@ -1623,14 +1624,14 @@ function updateApiKeyVerifyUI(forcedState) {
   if (!indicator) return;
 
   const key = getStoredApiKey();
-  let store.state = forcedState;
-  if (!store.state) {
-    if (apiKeyVerifyInFlight) store.state = 'checking';
-    else if (apiKeyVerifyCache.key === key) store.state = apiKeyVerifyCache.state;
-    else store.state = 'idle';
+  let verifyState = forcedState;
+  if (!verifyState) {
+    if (apiKeyVerifyInFlight) verifyState = 'checking';
+    else if (apiKeyVerifyCache.key === key) verifyState = apiKeyVerifyCache.state;
+    else verifyState = 'idle';
   }
 
-  if (store.state === 'idle' || !key) {
+  if (verifyState === 'idle' || !key) {
     indicator.hidden = true;
     indicator.className = 'api-key-verify-indicator';
     indicator.textContent = '';
@@ -1639,15 +1640,15 @@ function updateApiKeyVerifyUI(forcedState) {
   }
 
   indicator.hidden = false;
-  indicator.className = `api-key-verify-indicator is-${store.state}`;
+  indicator.className = `api-key-verify-indicator is-${verifyState}`;
 
-  if (store.state === 'checking') {
+  if (verifyState === 'checking') {
     indicator.innerHTML = '<span class="api-verify-spinner" aria-hidden="true"></span><span>בודק מפתח...</span>';
     if (btn) btn.disabled = true;
-  } else if (store.state === 'valid') {
+  } else if (verifyState === 'valid') {
     indicator.innerHTML = '<span class="api-verify-icon valid" aria-hidden="true">✓</span><span>מפתח תקין</span>';
     if (btn) btn.disabled = false;
-  } else if (store.state === 'invalid') {
+  } else if (verifyState === 'invalid') {
     indicator.innerHTML = '<span class="api-verify-icon invalid" aria-hidden="true">✗</span><span>מפתח לא תקין</span>';
     if (btn) btn.disabled = false;
   }
@@ -2859,14 +2860,15 @@ async function startSequelBook(sourceId, lengthKey) {
 // ===== CHAPTER PIPELINE (מאחורי הקלעים) =====
 function requestChapterGeneration(idx, opts = {}) {
   return new Promise((resolve, reject) => {
-    const dup = store.chapterGenQueue.find(j => j.idx === idx);
+    const bookId = store.state.id;
+    const dup = store.chapterGenQueue.find(j => j.idx === idx && j.bookId === bookId);
     if (dup) {
       dup.resolves.push(resolve);
       dup.rejects.push(reject);
       pumpChapterGenQueue();
       return;
     }
-    store.chapterGenQueue.push({ idx, opts, resolves: [resolve], rejects: [reject] });
+    store.chapterGenQueue.push({ idx, bookId, opts, resolves: [resolve], rejects: [reject] });
     pumpChapterGenQueue();
   });
 }
@@ -2877,6 +2879,12 @@ async function pumpChapterGenQueue() {
   try {
     while (store.chapterGenQueue.length) {
       const job = store.chapterGenQueue[0];
+      // Job queued for a book that is no longer open — drop it quietly
+      if (job.bookId !== store.state.id) {
+        job.resolves.forEach(r => r());
+        store.chapterGenQueue.shift();
+        continue;
+      }
       if (store.state.writing && store.state.generatingIdx !== job.idx) {
         await waitForGeneration();
         continue;
@@ -2920,6 +2928,16 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   }
 
   ensureMemoryBook();
+  // applyBookSnapshot replaces `state` wholesale; if that happens mid-generation,
+  // stop before writing anything into the newly opened book.
+  const genState = store.state;
+  const assertSameBook = () => {
+    if (store.state !== genState) {
+      const err = new Error('book switched during generation');
+      err.bookSwitched = true;
+      throw err;
+    }
+  };
   setGeminiCallPriority(background ? 'low' : 'high');
   store.state.writing = true;
   store.state.generatingIdx = idx;
@@ -2937,9 +2955,11 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
   try {
     setPreparingStatus(`מכין את פרק ${chapterNum}...`, useLoadingScreen);
     const plan = await planChapter(idx);
+    assertSameBook();
 
     setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum})...`, useLoadingScreen);
     const onScene = (si, total) => {
+      assertSameBook();
       setPreparingStatus(`ממשיך את הסיפור (פרק ${chapterNum}, חלק ${si + 1}/${total})...`, useLoadingScreen);
     };
 
@@ -2950,6 +2970,7 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
         text = await writeChapter(idx, plan, onScene);
         break;
       } catch (e) {
+        assertSameBook();
         lastWriteErr = e;
         if (writeAttempt < 1) {
           setPreparingStatus(`מנסה שוב לכתוב את פרק ${chapterNum}...`, useLoadingScreen);
@@ -2958,19 +2979,23 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
     }
     if (!text) throw lastWriteErr;
 
+    assertSameBook();
     let validatedText = text;
 
     setPreparingStatus(`מוודא שהפרק ${chapterNum} מוכן...`, useLoadingScreen);
     let review = await reviewChapter(text, idx, plan);
+    assertSameBook();
     let fixAttempts = 0;
     while (!review.approved && fixAttempts < 2) {
       setPreparingStatus(`מלטש את פרק ${chapterNum}...`, useLoadingScreen);
       const candidate = await fixChapter(text, review, idx, plan);
+      assertSameBook();
       if (isChapterTextValid(candidate)) {
         text = candidate;
         validatedText = candidate;
       }
       review = await reviewChapter(text, idx, plan);
+      assertSameBook();
       fixAttempts++;
     }
 
@@ -2982,14 +3007,20 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
       }
     }
 
-    store.state.chapters.push({ title: sanitizeChapterTitle(outline.title, chapterNum), text, number: chapterNum });
-
     setPreparingStatus('כמעט מוכן...', useLoadingScreen);
-    await updateMemoryBook(text, chapterNum, outline);
+    const memoryBook = await updateMemoryBook(text, chapterNum, outline);
+    assertSameBook();
     const summary = await summarizeChapter(text, chapterNum, outline);
+    assertSameBook();
+
+    // Commit chapter, memory and event log together (no await in between)
+    store.state.chapters.push({ title: sanitizeChapterTitle(outline.title, chapterNum), text, number: chapterNum });
+    if (memoryBook) store.state.memoryBook = memoryBook;
     if (!store.state.eventLog) store.state.eventLog = [];
     store.state.eventLog.push(`פרק ${chapterNum} (${outline.title}):\n${summary}`);
+    save();
     await maybeCompressStorySynopsis();
+    assertSameBook();
 
     store.state.writing = false;
     store.state.generatingIdx = null;
@@ -3007,6 +3038,11 @@ async function runGenerateChapterAt(idx, { background = false, openAfter = false
 
   } catch(e) {
     popGeminiCallPriority();
+    if (e?.bookSwitched) {
+      // The open book is a different one now — leave its store.state and UI alone
+      console.info(`chapter ${chapterNum} generation dropped: book switched`);
+      return;
+    }
     store.state.writing = false;
     store.state.generatingIdx = null;
     save();
@@ -3338,13 +3374,15 @@ ${chapterText.substring(0, 6000)}
 
 כללים: עדכן קיימים, הוסף חדשים, סמן תעלומות שנפתרו, אל תמחק עובדות חשובות מפרקים קודמים. JSON בלבד.`;
 
+  // Returns the updated memory book (or null); the caller commits it to store.state
   try {
     const { text } = await callGeminiLiteRaw(prompt, '', 4000, { jsonMode: true });
     const updated = parseJsonFromResponse(text);
-    if (updated?.characters) store.state.memoryBook = migrateMemoryBook(updated);
+    if (updated?.characters) return migrateMemoryBook(updated);
   } catch(e) {
     console.warn('updateMemoryBook failed:', e);
   }
+  return null;
 }
 
 // ===== SUMMARIZE CHAPTER (event log) =====
@@ -3931,7 +3969,7 @@ function openChapter(idx) {
   save();
 
   applyReadingPrefs();
-  if ('store.wakeLock' in navigator && !store.wakeLock) {
+  if ('wakeLock' in navigator && !store.wakeLock) {
     navigator.wakeLock.request('screen').then(wl => {
       store.wakeLock = wl;
       wl.addEventListener('release', () => { store.wakeLock = null; updateWakeLockButton(false); });
@@ -3956,7 +3994,7 @@ function openChapter(idx) {
     .map(p => p.trim())
     .filter(p => p.length > 0)
     .map(p => {
-      if (p === '***' || p === '* * *') {
+      if (p === '[***]' || p === '***' || p === '* * *') {
         return '<div class="chapter-divider">✦ ✦ ✦</div>';
       }
       return `<p>${escapeHtml(p)}</p>`;
