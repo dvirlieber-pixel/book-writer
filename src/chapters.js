@@ -3,7 +3,6 @@ import * as cfg from './constants.js';
 import { store } from './store.js';
 import {
   assertChapterTextValid,
-  callGeminiLite,
   callGeminiLiteRaw,
   callGeminiRaw,
   countWords,
@@ -204,9 +203,7 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     }
 
     setPreparingStatus('כמעט מוכן...', useLoadingScreen);
-    const memoryBook = await updateMemoryBook(text, chapterNum, outline);
-    assertSameBook();
-    const summary = await summarizeChapter(text, chapterNum, outline);
+    const { memoryBook, summary } = await analyzeChapter(text, chapterNum, outline);
     assertSameBook();
 
     // Commit chapter, memory and event log together (no await in between)
@@ -547,55 +544,67 @@ ${chapterBody}`;
   return fixed;
 }
 
-export async function updateMemoryBook(chapterText, chapterNum, outline) {
+/** Chapter text for analysis prompts: whole chapter, or start + end when very long */
+export function chapterTextForAnalysis(chapterText, maxChars = 14000) {
+  if (chapterText.length <= maxChars) return chapterText;
+  const head = Math.floor(maxChars * 0.35);
+  return `${chapterText.slice(0, head)}\n\n[...]\n\n${chapterText.slice(-(maxChars - head))}`;
+}
+
+/** Shape the analysis response; falls back per field so one bad field doesn't lose the other */
+export function parseChapterAnalysis(raw, chapterText, chapterNum) {
+  const data = parseJsonFromResponse(raw || '') || {};
+  const memoryBook = data.memoryBook?.characters ? migrateMemoryBook(data.memoryBook) : null;
+  const lines = Array.isArray(data.summary) ? data.summary : [data.summary];
+  const summary = lines
+    .map(l => String(l ?? '').trim())
+    .filter(Boolean)
+    .map(l => (l.startsWith('-') ? l : `- ${l}`))
+    .join('\n');
+  return {
+    memoryBook,
+    summary: summary || `פרק ${chapterNum}: ${chapterText.substring(0, 200)}...`
+  };
+}
+
+/**
+ * One Lite call after each chapter: updates the memory book and writes the event-log
+ * summary from the full chapter text (previously two calls that only saw its opening).
+ * Returns { memoryBook (or null), summary }; the caller commits both to store.state.
+ */
+export async function analyzeChapter(chapterText, chapterNum, outline) {
   ensureMemoryBook();
   const current = JSON.stringify(store.state.memoryBook, null, 2);
 
-  const prompt = `עדכן את ספר הזיכרון של הספר על בסיס הפרק החדש.
+  const prompt = `קרא את הפרק החדש ובצע שתי משימות. החזר JSON בלבד.
+
+1. summary — 4-6 נקודות קצרות בעברית: אירועים מרכזיים, החלטות חשובות של דמויות, שינויים במצב העולם, וכל מידע חיוני להמשך. רק עובדות, ללא הקדמה.
+2. memoryBook — ספר הזיכרון המעודכן: עדכן קיימים, הוסף חדשים, סמן תעלומות שנפתרו, אל תמחק עובדות חשובות מפרקים קודמים.
 
 ספר זיכרון נוכחי:
 ${current}
 
 פרק ${chapterNum} — ${outline.title}:
-${chapterText.substring(0, 6000)}
+${chapterTextForAnalysis(chapterText)}
 
-החזר JSON בלבד:
+מבנה התשובה:
 {
-  "characters": [{"name":"","role":"","status":"","notes":""}],
-  "locations": [{"name":"","description":"","significance":""}],
-  "keyObjects": [{"name":"","description":"","owner":"","status":""}],
-  "worldRules": [{"rule":"","establishedInChapter":0,"notes":""}],
-  "openMysteries": [{"question":"","introducedChapter":0,"status":"פתוח|נפתר|בתהליך","clues":""}]
-}
-
-כללים: עדכן קיימים, הוסף חדשים, סמן תעלומות שנפתרו, אל תמחק עובדות חשובות מפרקים קודמים. JSON בלבד.`;
-
-  // Returns the updated memory book (or null); the caller commits it to store.state
-  try {
-    const { text } = await callGeminiLiteRaw(prompt, '', 4000, { jsonMode: true });
-    const updated = parseJsonFromResponse(text);
-    if (updated?.characters) return migrateMemoryBook(updated);
-  } catch(e) {
-    console.warn('updateMemoryBook failed:', e);
+  "summary": ["אירוע", "אירוע"],
+  "memoryBook": {
+    "characters": [{"name":"","role":"","status":"","notes":""}],
+    "locations": [{"name":"","description":"","significance":""}],
+    "keyObjects": [{"name":"","description":"","owner":"","status":""}],
+    "worldRules": [{"rule":"","establishedInChapter":0,"notes":""}],
+    "openMysteries": [{"question":"","introducedChapter":0,"status":"פתוח|נפתר|בתהליך","clues":""}]
   }
-  return null;
-}
-
-// ===== SUMMARIZE CHAPTER (event log) =====
-export async function summarizeChapter(chapterText, chapterNum, outline) {
-  const prompt = `קרא את הפרק הבא וסכם אותו ב-4-6 משפטים קצרים בעברית.
-הסיכום חייב לכלול: אירועים מרכזיים שקרו, החלטות חשובות של דמויות, שינויים במצב העולם, וכל מידע שחיוני להמשך הסיפור.
-כתוב בצורת נקודות: "- [אירוע]". ללא הקדמה, ללא סיכום כללי — רק עובדות.
-
-פרק ${chapterNum} — ${outline.title}:
-${chapterText.substring(0, 3000)}`;
+}`;
 
   try {
-    const summary = await callGeminiLite(prompt, '', 800);
-    return summary.trim();
-  } catch(e) {
-    // Fallback: use first 200 chars
-    return `פרק ${chapterNum}: ${chapterText.substring(0, 200)}...`;
+    const { text } = await callGeminiLiteRaw(prompt, '', 5000, { jsonMode: true });
+    return parseChapterAnalysis(text, chapterText, chapterNum);
+  } catch (e) {
+    console.warn('analyzeChapter failed:', e);
+    return parseChapterAnalysis('', chapterText, chapterNum);
   }
 }
 

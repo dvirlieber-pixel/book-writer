@@ -378,16 +378,18 @@ export function mergeContinuation(existing, continuation) {
   const tail = existing.trimEnd();
   const head = continuation.trimStart();
   if (!head) return tail;
-  const overlap = 120;
-  const tailBit = tail.slice(-overlap);
-  if (tailBit.length > 20 && head.startsWith(tailBit)) {
-    return tail + head.slice(tailBit.length);
+  // The model often restates the last few words before continuing: drop the longest
+  // end-of-tail / start-of-head overlap (15+ chars, so a shared short word isn't cut)
+  for (let len = Math.min(tail.length, head.length, 400); len >= 15; len--) {
+    if (head.startsWith(tail.slice(-len))) return tail + head.slice(len);
   }
+  const tailBit = tail.slice(-120);
   if (head.includes(tailBit) && tailBit.length > 20) {
     const idx = head.indexOf(tailBit);
     return tail + head.slice(idx + tailBit.length);
   }
-  return tail + '\n' + head;
+  // Cut mid-sentence (e.g. MAX_TOKENS): keep the sentence in one paragraph
+  return tail + (endsWithCompleteSentence(tail) ? '\n' : ' ') + head;
 }
 
 /** בדיקה קלילה של מפתח API — countTokens, ללא תור ה-rate limiter */
