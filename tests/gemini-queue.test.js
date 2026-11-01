@@ -11,7 +11,7 @@ const promptOf = init => JSON.parse(init.body).contents[0].parts[0].text;
 describe('Gemini request queue', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.stubGlobal('document', { getElementById: () => null });
+    vi.stubGlobal('document', { getElementById: () => null, querySelectorAll: () => [] });
     store.app.apiKey = 'test-key';
   });
 

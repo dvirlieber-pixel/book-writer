@@ -20,6 +20,12 @@ import {
   renderLibrary
 } from './library.js';
 import {
+  renderBackupReminder
+} from './prefs-export.js';
+import {
+  refreshQuotaNotice
+} from './quota.js';
+import {
   openChapter
 } from './reading.js';
 import {
@@ -73,6 +79,8 @@ export function shelfCount() {
 export function renderShelf() {
   const grid = document.getElementById('shelf-grid');
   if (!grid) return;
+  renderBackupReminder();
+  refreshQuotaNotice();
   const filterEl = document.getElementById('shelf-filter');
   const sortEl = document.getElementById('shelf-sort');
   if (filterEl) filterEl.value = store.shelfFilter;

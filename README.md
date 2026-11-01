@@ -42,6 +42,7 @@ npm test         # בדיקות (vitest)
 | `shelf.js` / `library.js` / `reading.js` / `screens.js` | מסכי המדף, הספר, הקריאה והאשף |
 | `world-dictionary.js` | מילון העולם |
 | `prefs-export.js` | העדפות קריאה, PWA, גיבוי JSON |
+| `quota.js` | הערכת המכסה היומית של Gemini (לפי יום Pacific) והתצוגה שלה |
 | `utils.js` | עזרים משותפים (`escapeHtml`, `showError`, ...) |
 
 מצב משותף תמיד דרך `store.app` / `store.state` — לא משתנים גלובליים. כפתור חדש: הוסף `data-action` ב-HTML וייצא פונקציה באותו שם מאחד המודולים.

@@ -7,6 +7,10 @@ import {
 import {
   save
 } from './storage.js';
+import {
+  markQuotaExhausted,
+  recordQuotaUse
+} from './quota.js';
 
 // ===== API CALL =====
 
@@ -206,6 +210,12 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
 
   const apiKey = getStoredApiKey();
   if (!apiKey) throw new Error('נדרש מפתח Gemini — הגדר מפתח בהגדרות');
+  const timeoutMs = Math.max(cfg.GEMINI_FETCH_TIMEOUT_MS, maxTokens * cfg.GEMINI_TIMEOUT_MS_PER_TOKEN);
+  const dailyQuotaError = msg => {
+    markQuotaExhausted(model);
+    return quotaExceededError(msg);
+  };
+  let timedOut = false;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
@@ -213,7 +223,7 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
     try {
       const response = await enqueueGeminiRequest(() => {
         // Timeout starts when the request is actually sent, not while it waits in the queue
-        timeoutId = setTimeout(() => controller.abort(), cfg.GEMINI_FETCH_TIMEOUT_MS);
+        timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         return fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
           {
@@ -235,7 +245,7 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
       if (response.status === 429) {
         const errBody = await response.json().catch(() => ({}));
         const msg = errBody?.error?.message || '';
-        if (isDailyQuotaError(msg)) throw quotaExceededError(msg);
+        if (isDailyQuotaError(msg)) throw dailyQuotaError(msg);
         const retryHdr = parseInt(response.headers.get('Retry-After'), 10);
         const backoffMs = scheduleGeminiPause(
           (retryHdr && !Number.isNaN(retryHdr) ? retryHdr * 1000 : null)
@@ -265,7 +275,7 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
           attempt--;
           continue;
         }
-        if (isQuotaApiError(response.status, msg) && isDailyQuotaError(msg)) throw quotaExceededError(msg);
+        if (isQuotaApiError(response.status, msg) && isDailyQuotaError(msg)) throw dailyQuotaError(msg);
         if (response.status === 404 || isModelNotFoundError(null, response.status)) {
           const e = new Error(msg);
           e.status = 404;
@@ -276,6 +286,7 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
       }
 
       const data = await response.json();
+      recordQuotaUse(model);
       const candidate = data.candidates?.[0];
       return {
         text: candidate?.content?.parts?.[0]?.text || '',
@@ -285,6 +296,13 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
     } catch(e) {
       clearTimeout(timeoutId);
       if (e.name === 'AbortError') {
+        // Only one more try: the server may have finished (and counted) the request anyway
+        if (!timedOut && attempt < retries) {
+          timedOut = true;
+          const statusEl = document.getElementById('loading-status') || document.getElementById('writing-status-text');
+          if (statusEl) statusEl.textContent = 'הבקשה נמשכה זמן רב — מנסה שוב...';
+          continue;
+        }
         throw new Error('הבקשה לשרת נמשכה יותר מדי — נסה שוב');
       }
       if (e.modelNotFound || isModelNotFoundError(e, e.status)) throw e;

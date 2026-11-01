@@ -251,6 +251,14 @@
       </select>
     </div>
     <div class="shelf-grid" id="shelf-grid"></div>
+    <div class="backup-reminder" id="backup-reminder" role="status" hidden>
+      <span id="backup-reminder-text"></span>
+      <div class="backup-reminder-actions">
+        <button type="button" class="secondary-btn" data-action="exportLibraryJson">📂 גבה עכשיו</button>
+        <button type="button" class="backup-reminder-snooze" data-action="snoozeBackupReminder">הזכר לי בעוד שבוע</button>
+      </div>
+    </div>
+    <div class="quota-notice" id="shelf-quota-notice" style="display:none" role="status"></div>
     <div class="library-actions" style="margin-top:1.5rem">
       <button type="button" class="secondary-btn" data-action="exportLibraryJson" title="גיבוי ספרים והעדפות בלבד — ללא מפתח API">📂 גיבוי המדף (JSON)</button>
       <label class="secondary-btn" style="cursor:pointer;margin:0">
@@ -354,6 +362,7 @@
         <span id="writing-status-text">מכין את הפרק...</span>
       </div>
       <div class="library-actions" id="library-actions"></div>
+      <div class="quota-notice" id="library-quota-notice" style="display:none" role="status"></div>
       <div class="model-fallback-notice" id="library-model-fallback-notice" style="display:none" role="status"></div>
       <div id="library-error" class="error-msg" style="display:none" role="alert" aria-live="assertive"></div>
     </div>

@@ -25,6 +25,10 @@ export function boot(App) {
     }
     App.updateApiKeyStatus();
     App.refreshModelFallbackNotice();
+    App.refreshQuotaNotice();
+    if (Object.keys(store.app.books || {}).length) {
+      App.ensurePersistentStorage().then(() => App.renderBackupReminder());
+    }
     App.updateWelcomeWizardUI();
     bootstrapAfterSplash();
   }

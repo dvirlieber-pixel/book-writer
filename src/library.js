@@ -19,10 +19,14 @@ import {
 import {
   renderWorldDictionaryLibraryEntry
 } from './world-dictionary.js';
+import {
+  refreshQuotaNotice
+} from './quota.js';
 import { escapeHtml } from './utils.js';
 
 // ===== RENDER LIBRARY =====
 export function renderLibrary() {
+  refreshQuotaNotice();
   if (!store.state.book) return;
 
   const book = store.state.book;

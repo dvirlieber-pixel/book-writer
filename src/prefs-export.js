@@ -275,6 +275,37 @@ export async function exportLibraryJson() {
   a.download = 'seferiyat-hanetzach-shelf.json';
   a.click();
   URL.revokeObjectURL(url);
+  store.app.lastBackupAt = Date.now();
+  save();
+  renderBackupReminder();
+}
+
+/** Only once the browser has answered that it may evict the books (storagePersisted === false) */
+export function shouldShowBackupReminder(now = Date.now()) {
+  if (store.storagePersisted !== false) return false;
+  const hasChapters = Object.values(store.app.books || {}).some(b => b?.chapters?.length);
+  if (!hasChapters) return false;
+  const last = Math.max(store.app.lastBackupAt || 0, store.app.backupReminderSnoozedAt || 0);
+  return now - last > cfg.BACKUP_REMINDER_INTERVAL_MS;
+}
+
+export function renderBackupReminder() {
+  const el = document.getElementById('backup-reminder');
+  if (!el) return;
+  el.hidden = !shouldShowBackupReminder();
+  const text = document.getElementById('backup-reminder-text');
+  if (!text || el.hidden) return;
+  const days = store.app.lastBackupAt
+    ? Math.floor((Date.now() - store.app.lastBackupAt) / (24 * 60 * 60 * 1000))
+    : null;
+  text.textContent = 'הדפדפן לא התחייב לשמור את הספרים לצמיתות — הוא עלול למחוק אותם כשחסר מקום או אחרי תקופה בלי שימוש. '
+    + (days == null ? 'עדיין לא שמרת גיבוי.' : `הגיבוי האחרון נשמר לפני ${days} ימים.`);
+}
+
+export function snoozeBackupReminder() {
+  store.app.backupReminderSnoozedAt = Date.now();
+  save();
+  renderBackupReminder();
 }
 
 export function onImportLibraryFile(ev) {

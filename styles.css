@@ -1025,6 +1025,41 @@
     line-height: 1.5;
     border-radius: 1px;
   }
+  .quota-notice {
+    font-size: 0.76rem;
+    margin-top: 0.65rem;
+    color: var(--text-subtle);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .quota-notice.low { color: var(--error-text); }
+  .backup-reminder {
+    margin-top: 1.25rem;
+    padding: 0.75rem 0.9rem;
+    background: var(--error-bg);
+    border: 1px solid var(--error-border);
+    color: var(--text-body);
+    font-size: 0.82rem;
+    line-height: 1.55;
+  }
+  .backup-reminder[hidden] { display: none; }
+  .backup-reminder-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.6rem;
+  }
+  .backup-reminder-snooze {
+    background: none;
+    border: none;
+    color: var(--text-subtle);
+    font: inherit;
+    font-size: 0.78rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0.3rem;
+  }
   .api-key-row {
     display: flex;
     gap: 0.5rem;

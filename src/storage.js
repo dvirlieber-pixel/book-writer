@@ -129,8 +129,30 @@ export function ensureMinimalAppShell() {
   if (store.app.lastReadingSession === undefined) store.app.lastReadingSession = null;
 }
 
+// Without a persistence grant the browser may evict IndexedDB under storage pressure (Safari
+// also after about a week unused), taking every book with it. Asked once there is a book to lose.
+let persistRequest = null;
+export function ensurePersistentStorage() {
+  if (!persistRequest) {
+    persistRequest = (async () => {
+      const storage = typeof navigator !== 'undefined' ? navigator.storage : null;
+      if (!storage?.persist) return false;
+      try {
+        return (await storage.persisted()) || (await storage.persist());
+      } catch (_) {
+        return false;
+      }
+    })().then(granted => {
+      store.storagePersisted = granted;
+      return granted;
+    });
+  }
+  return persistRequest;
+}
+
 export async function flushSave() {
   syncAppFromState();
+  if (Object.keys(store.app.books || {}).length) ensurePersistentStorage();
   try {
     await idbWriteApp(store.app);
     try { localStorage.removeItem(cfg.STORAGE_KEY); } catch (_) {}

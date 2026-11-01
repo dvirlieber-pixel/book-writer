@@ -8,6 +8,13 @@ export const IDB_STORE = 'kv';
 export const IDB_META_KEY = 'app-v3';
 export const IDB_BOOK_PREFIX = 'book:';
 export const GEMINI_FETCH_TIMEOUT_MS = 120000;
+/** A long chapter takes longer to generate: the timeout grows with the output budget */
+export const GEMINI_TIMEOUT_MS_PER_TOKEN = 12;
+/** Free-tier prose-model requests per day — an estimate; the API reports no usage until it refuses */
+export const GEMINI_PROSE_DAILY_LIMIT = 20;
+/** Typical prose requests per chapter (the write plus a continuation or a fix) */
+export const PROSE_CALLS_PER_CHAPTER = 2;
+export const BACKUP_REMINDER_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 /** מרווח מינימלי בין בקשות — שומר מתחת למכסת RPM החינמית */
 export const GEMINI_MIN_REQUEST_GAP_MS = 2800;
 /** מקסימום בקשות בדקה (חלון גלישה) */
