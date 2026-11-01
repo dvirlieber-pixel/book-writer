@@ -214,7 +214,7 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     if (isLiveChapterShown(idx)) {
       // The reader is already reading this text: a rewrite would pull it out from under them,
       // so problems are fixed by small in-place edits. A failure here never costs the chapter.
-      setLiveChapterStatus(idx, 'הפרק נכתב ✦ בודק עקביות...');
+      setLiveChapterStatus(idx, 'הפרק נכתב. בודק עקביות...');
       try {
         const liveReview = await reviewChapter(text, idx, plan);
         assertSameBook();
@@ -368,12 +368,12 @@ export function updatePrepareNextButton() {
   if (store.state.writing && store.state.generatingIdx === nextIdx) {
     btn.style.display = 'flex';
     btn.disabled = true;
-    btn.textContent = `⏳ מכין את "${label}" ברקע...`;
+    btn.textContent = `כותב את "${label}" ברקע...`;
     return;
   }
   btn.style.display = 'flex';
   btn.disabled = !!store.state.writing;
-  btn.textContent = `⚡ הכן את "${label}" מראש (אופציונלי)`;
+  btn.textContent = `הכן מראש את "${label}"`;
 }
 
 export function getReadingContinuationIndex() {

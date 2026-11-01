@@ -39,6 +39,7 @@ import {
   deleteBookFromShelf,
   escapeHtml
 } from './utils.js';
+import { icon } from './icons.js';
 
 export function onShelfFilterChange(v) { store.shelfFilter = v; renderShelf(); }
 export function onShelfSortChange(v) { store.shelfSort = v; renderShelf(); }
@@ -90,12 +91,12 @@ export function renderShelf() {
   ids = sortShelfIds(ids);
 
   if (!Object.keys(store.app.books).length) {
-    grid.innerHTML = '<div class="shelf-empty">אין ספרים במדף — פתח ספר חדש להתחיל</div>';
+    grid.innerHTML = '<div class="shelf-empty">המדף ריק. לחץ על "ספר חדש" כדי לפתוח את הראשון.</div>';
     renderShelfContinueFab();
     return;
   }
   if (!ids.length) {
-    grid.innerHTML = '<div class="shelf-empty">אין ספרים בסינון זה — נסה סינון אחר</div>';
+    grid.innerHTML = '<div class="shelf-empty">אין ספרים שמתאימים לסינון הזה.</div>';
     renderShelfContinueFab();
     return;
   }
@@ -108,24 +109,22 @@ export function renderShelf() {
     const canContinue = continueIdx >= 0;
     const pct = total > 0 ? Math.round((written / total) * 100) : 0;
     const stars = b.rating ? '★'.repeat(b.rating) : '';
+    const isSeries = (b.sequelIndex || 1) > 1 || !!b.parentBookId;
+    const status = isBookComplete(b) ? '<span class="is-done">הושלם</span>' : written ? `${written} מתוך ${total} פרקים` : 'עוד לא התחלת';
+    const meta = [escapeHtml(genreDisplayLabel(getBookProfile(b))), isSeries ? `ספר ${b.sequelIndex || 1} בסדרה` : '', status, stars ? `<span class="stars" aria-label="${b.rating} כוכבים">${stars}</span>` : '']
+      .filter(Boolean).join(' · ');
 
     const card = document.createElement('div');
     card.className = 'shelf-card';
     card.innerHTML = `
-      <button type="button" class="shelf-card-main" style="flex:1;background:none;border:none;color:inherit;text-align:right;cursor:pointer;font:inherit;padding:0">
+      <button type="button" class="shelf-card-main">
         <div class="shelf-card-title">${escapeHtml(b.book?.title || 'ספר ללא שם')}</div>
-        <div class="shelf-card-meta">
-          <span class="meta-pill">${written}/${total} · ${pct}%</span>
-          ${isBookComplete(b) ? '<span class="meta-pill meta-done">הושלם</span>' : written ? '<span class="meta-pill">בתהליך</span>' : '<span class="meta-pill">חדש</span>'}
-          ${(b.sequelIndex || 1) > 1 || b.parentBookId ? `<span class="meta-pill meta-series">סדרה ${b.sequelIndex || 1}</span>` : ''}
-          <span class="meta-pill">${escapeHtml(genreDisplayLabel(getBookProfile(b)))}</span>
-          ${stars ? `<span class="meta-pill">${stars}</span>` : ''}
-        </div>
-        ${canContinue ? `<div style="font-size:0.78rem;color:var(--gold);margin-top:0.35rem">↪ המשך מפרק ${continueIdx + 1}</div>` : ''}
+        <div class="shelf-card-meta">${meta}</div>
+        ${total ? `<div class="shelf-card-progress" aria-hidden="true"><span style="width:${pct}%"></span></div>` : ''}
       </button>
       <div class="shelf-card-actions">
-        ${canContinue ? `<button type="button" class="shelf-continue-btn" data-continue="${id}">המשך קריאה</button>` : ''}
-        <button type="button" class="read-tool-btn" title="מחק" data-delete="${id}">✕</button>
+        ${canContinue ? `<button type="button" class="shelf-continue-btn" data-continue="${id}">לפרק ${continueIdx + 1}</button>` : ''}
+        <button type="button" class="icon-btn" title="מחק ספר" aria-label="מחק את ${escapeHtml(b.book?.title || 'הספר')}" data-delete="${id}">${icon('trash')}</button>
       </div>`;
 
     card.querySelector('.shelf-card-main').onclick = () => openBookFromShelf(id);
@@ -205,7 +204,7 @@ export function renderShelfContinueFab() {
   }
 
   const shortTitle = target.title.length > 32 ? target.title.slice(0, 30) + '…' : target.title;
-  label.textContent = `המשך לקרוא: ${shortTitle} — פרק ${target.chapterNum}`;
+  label.textContent = `חזרה לקריאה: ${shortTitle}, פרק ${target.chapterNum}`;
   fab.hidden = false;
   if (body) body.classList.add('has-continue-fab');
 }

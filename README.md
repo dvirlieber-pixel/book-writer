@@ -17,7 +17,7 @@ npm test         # בדיקות (vitest)
 | נתיב | תפקיד |
 |------|--------|
 | `index.html` | מעטפת HTML; כפתורים מסומנים ב-`data-action="<שם פונקציה>"` |
-| `styles.css` | עיצוב |
+| `styles.css` | עיצוב — טוקנים בראש הקובץ; ראו `DESIGN.md` |
 | `src/` | קוד המקור — מודולי ES רגילים, בלי שלב בנייה נוסף |
 | `public/` | נכסי PWA: `sw.js`, `manifest`, אייקונים, `dl-splash.js` / `dl-watermark.js` |
 | `tests/` | בדיקות vitest |
@@ -43,6 +43,7 @@ npm test         # בדיקות (vitest)
 | `world-dictionary.js` | מילון העולם |
 | `prefs-export.js` | העדפות קריאה, PWA, גיבוי JSON |
 | `quota.js` | הערכת המכסה היומית של Gemini (לפי יום Pacific) והתצוגה שלה |
+| `icons.js` | אייקוני SVG לממשק (`icon(name)`, `data-icon` ב-HTML) |
 | `utils.js` | עזרים משותפים (`escapeHtml`, `showError`, ...) |
 
 מצב משותף תמיד דרך `store.app` / `store.state` — לא משתנים גלובליים. כפתור חדש: הוסף `data-action` ב-HTML וייצא פונקציה באותו שם מאחד המודולים.

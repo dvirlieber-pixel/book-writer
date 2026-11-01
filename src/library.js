@@ -23,6 +23,7 @@ import {
   refreshQuotaNotice
 } from './quota.js';
 import { escapeHtml } from './utils.js';
+import { icon } from './icons.js';
 
 // ===== RENDER LIBRARY =====
 export function renderLibrary() {
@@ -58,16 +59,15 @@ export function renderLibrary() {
   }
 
   const seriesBadge = store.state.sequelIndex > 1
-    ? `<span>📜 ספר ${store.state.sequelIndex} · ${escapeHtml(store.state.seriesTitle || book.title)}</span>` : '';
+    ? `<span>ספר ${store.state.sequelIndex} בסדרה ${escapeHtml(store.state.seriesTitle || book.title)}</span>` : '';
 
   document.getElementById('book-meta').innerHTML =
-    `<span>📚 ${total} פרקים</span><span>✨ ${escapeHtml(genreDisplayLabel())}</span>` +
-    `<span>👁 ${writtenCount} זמינים</span>${seriesBadge}`;
+    `<span>${escapeHtml(genreDisplayLabel())}</span><span>${total} פרקים</span>${seriesBadge}`;
   document.getElementById('book-tagline').textContent = book.tagline || '';
 
   // Progress
   const pct = total > 0 ? Math.round((writtenCount / total) * 100) : 0;
-  document.getElementById('progress-text').textContent = `${writtenCount} / ${total} זמינים`;
+  document.getElementById('progress-text').textContent = `${writtenCount} מתוך ${total} פרקים נכתבו`;
   document.getElementById('progress-fill').style.width = pct + '%';
 
   // Chapter list
@@ -85,16 +85,16 @@ export function renderLibrary() {
     btn.className = `chapter-item ${isWritten ? 'written' : isNext ? 'next-to-write' : 'locked'}`;
 
     const isPreparing = isNext && store.state.writing && store.state.generatingIdx === i;
-    const statusLabel = isWritten ? '<span class="chapter-status done">✓</span>' :
-                        isPreparing ? '<span class="chapter-status write">⏳</span>' :
-                        isNext ? '<span class="chapter-status write">📖</span>' :
-                        '<span class="chapter-status lock">🔒</span>';
+    const statusLabel = isWritten ? `<span class="chapter-status done" aria-label="נקרא">${icon('check')}</span>` :
+                        isPreparing ? '<span class="chapter-status write is-busy">נכתב</span>' :
+                        isNext ? '<span class="chapter-status write">הבא</span>' :
+                        `<span class="chapter-status lock" aria-label="נעול">${icon('lock')}</span>`;
 
     btn.innerHTML = `
       <span class="chapter-num">${i+1}</span>
       <div class="chapter-info">
-        <div class="chapter-name">${isWritten || isNext ? escapeHtml(outline.title) : '???'}</div>
-        <div class="chapter-hint">${isWritten ? `נקודת מבט: ${escapeHtml(outline.pov)}` : isPreparing ? 'בהכנה...' : isNext ? 'לחץ "המשך לקרוא"' : 'יקריא לאחר הפרקים הקודמים'}</div>
+        <div class="chapter-name">${isWritten || isNext ? escapeHtml(outline.title) : 'פרק נעול'}</div>
+        <div class="chapter-hint">${isWritten ? `מנקודת המבט של ${escapeHtml(outline.pov)}` : isPreparing ? 'נכתב עכשיו...' : isNext ? 'ייכתב כשתפתח אותו' : 'ייפתח אחרי הפרקים הקודמים'}</div>
       </div>
       ${statusLabel}
     `;
@@ -116,7 +116,7 @@ export function renderLibrary() {
       const compact = document.createElement('button');
       compact.type = 'button';
       compact.className = 'chapter-item compact-locked';
-      compact.innerHTML = `<span class="chapter-hint" style="font-style:normal">🔒 עוד ${hiddenCount} פרקים ייפתחו בהמשך · לחץ להציג הכל</span>`;
+      compact.innerHTML = `<span class="chapter-hint">ועוד ${hiddenCount} פרקים נעולים</span>`;
       compact.onclick = () => {
         store.state.expandChapterList = true;
         save();
@@ -124,13 +124,6 @@ export function renderLibrary() {
       };
       list.appendChild(compact);
     }
-  }
-
-  if (!expanded && writtenCount < total) {
-    requestAnimationFrame(() => {
-      const nextEl = list.querySelector('.next-to-write');
-      if (nextEl) nextEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    });
   }
 
   // Write next button
@@ -143,9 +136,9 @@ export function renderLibrary() {
     writeBtn.disabled = store.state.writing;
     const last = store.state.lastReadChapter ?? -1;
     const hasUnread = last + 1 < writtenCount;
-    if (writtenCount === 0) writeBtn.textContent = '📖 התחל לקרוא';
-    else if (hasUnread) writeBtn.textContent = `↪ המשך מפרק ${last + 2}`;
-    else writeBtn.textContent = '📖 המשך לקרוא';
+    if (writtenCount === 0) writeBtn.textContent = 'התחל לקרוא';
+    else if (hasUnread) writeBtn.textContent = `המשך לפרק ${last + 2}`;
+    else writeBtn.textContent = `קרא את פרק ${writtenCount + 1}`;
   }
 
   updatePrepareNextButton();

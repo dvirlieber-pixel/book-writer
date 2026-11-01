@@ -1,4 +1,5 @@
 // World dictionary UI (memoryBook)
+import { icon } from './icons.js';
 import { store } from './store.js';
 import {
   ensureMemoryBook
@@ -39,10 +40,10 @@ export function renderWorldDictionaryLibraryEntry() {
   btn.className = 'world-dict-entry-btn';
   btn.dataset.action = 'openWorldDictionary';
   btn.innerHTML = `
-    <span class="world-dict-entry-icon" aria-hidden="true">🌍</span>
+    <span class="world-dict-entry-icon">${icon('globe')}</span>
     <span class="world-dict-entry-text">
       <strong>מילון העולם</strong>
-      <span class="world-dict-entry-hint">${count ? `${count} רשומות` : 'דמויות, מקומות ותעלומות'}${written ? ` · עודכן לפי ${written} פרקים` : ''}</span>
+      <span class="world-dict-entry-hint">${count ? (count === 1 ? 'רשומה אחת' : `${count} רשומות`) : 'דמויות, מקומות ותעלומות'}${written ? ` · עודכן לפי ${written} פרקים` : ''}</span>
     </span>
     <span class="world-dict-entry-chevron" aria-hidden="true">‹</span>`;
   slot.appendChild(btn);
@@ -91,7 +92,7 @@ export function renderWorldDictionaryTabs() {
     btn.dataset.arg = tab.id;
     btn.setAttribute('role', 'tab');
     btn.setAttribute('aria-selected', worldDictActiveTab === tab.id ? 'true' : 'false');
-    btn.innerHTML = `<span aria-hidden="true">${tab.icon}</span> ${tab.label}${count ? ` <span class="world-dict-tab-count">${count}</span>` : ''}`;
+    btn.innerHTML = `${tab.label}${count ? ` <span class="world-dict-tab-count">${count}</span>` : ''}`;
     nav.appendChild(btn);
   });
 }
@@ -173,7 +174,7 @@ export function renderWorldDictionaryContent() {
 
   el.innerHTML = `
     ${overview}
-    <h3 class="world-dict-section-title">${tabMeta?.icon || ''} ${tabMeta?.label || ''}</h3>
+    <h3 class="world-dict-section-title">${tabMeta?.label || ''}</h3>
     <div class="world-dict-cards">${body}</div>`;
 }
 

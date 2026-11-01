@@ -443,10 +443,9 @@ export function renderBookCompletePanel() {
   ).join('');
 
   panel.innerHTML = `
-    <h3>✦ הספר הושלם${seriesNote} ✦</h3>
-    <p class="ui-muted" style="font-size:0.85rem;margin-bottom:0.5rem">איך היה?</p>
-    <div class="rating-row">${stars}</div>
-    <p class="ui-faint" style="font-size:0.78rem;margin-top:0.75rem">הורדה והמשך בעולם — למטה</p>`;
+    <h3>הספר הושלם${seriesNote}</h3>
+    <p class="ui-muted">איך היה?</p>
+    <div class="rating-row" role="group" aria-label="דירוג">${stars}</div>`;
 
   slot.appendChild(panel);
 }
@@ -467,20 +466,20 @@ export function renderLibraryActions() {
   const partial = store.state.chapters.length < store.state.totalChapters;
   const epubBtn = document.createElement('button');
   epubBtn.className = 'secondary-btn';
-  epubBtn.textContent = partial ? '📥 הורד EPUB (עד כה)' : '📥 הורד EPUB';
+  epubBtn.textContent = partial ? 'הורד EPUB (מה שנכתב עד עכשיו)' : 'הורד EPUB';
   epubBtn.onclick = () => exportBookEpub();
   el.appendChild(epubBtn);
 
   const htmlBtn = document.createElement('button');
   htmlBtn.className = 'secondary-btn';
-  htmlBtn.textContent = '📄 HTML';
+  htmlBtn.textContent = 'הורד HTML';
   htmlBtn.onclick = () => exportBookHtml();
   el.appendChild(htmlBtn);
 
   if (isBookComplete()) {
     const sequelBtn = document.createElement('button');
     sequelBtn.className = 'secondary-btn';
-    sequelBtn.textContent = '🌍 עוד סיפור באותו עולם';
+    sequelBtn.textContent = 'עוד סיפור באותו עולם';
     sequelBtn.onclick = () => promptSequelBook();
     el.appendChild(sequelBtn);
   }

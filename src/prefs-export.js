@@ -1,4 +1,5 @@
 // Reading prefs, PWA banners, library import/export
+import { icon } from './icons.js';
 import * as cfg from './constants.js';
 import { store } from './store.js';
 import { defaultBookProfile, createEmptyBookState } from './book-model.js';
@@ -86,8 +87,9 @@ export function updateLandscapeToggleButton() {
   const btn = document.getElementById('landscape-toggle-btn');
   if (!btn || !screen.orientation) return;
   const isLandscape = (screen.orientation.type || '').startsWith('landscape');
-  btn.textContent = isLandscape ? '⤒' : '⤡';
-  btn.title = isLandscape ? 'חזרה לאורך' : 'קריאה לרוחב (לחיצה מפורשת)';
+  btn.innerHTML = icon(isLandscape ? 'rotateBack' : 'rotate');
+  btn.title = isLandscape ? 'חזרה לאורך' : 'קריאה לרוחב';
+  btn.setAttribute('aria-label', btn.title);
   btn.classList.toggle('landscape-on', isLandscape);
 }
 
@@ -98,13 +100,13 @@ export function applyReadingPrefs() {
   document.body.classList.toggle('theme-light', isLight);
   document.body.classList.toggle('theme-dark', !isLight);
   document.body.classList.toggle('reading-immersive', !!p.immersive && isReadingScreenActive());
-  const themeIcon = isLight ? '☾' : '☀';
+  const themeIcon = icon(isLight ? 'moon' : 'sun');
   ['theme-toggle-btn', 'theme-toggle-shelf', 'theme-toggle-library'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.textContent = themeIcon;
+    if (el) el.innerHTML = themeIcon;
   });
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = isLight ? '#ebe4d4' : '#1a1410';
+  if (meta) meta.content = isLight ? '#f3efe4' : '#13201b';
   const imm = document.getElementById('immersive-toggle-btn');
   if (imm) imm.classList.toggle('immersive-on', !!p.immersive);
 }
@@ -149,8 +151,10 @@ export async function toggleWakeLock() {
 export function updateWakeLockButton(on) {
   const btn = document.getElementById('wake-toggle-btn');
   if (!btn) return;
-  btn.textContent = on ? '💤' : '💡';
-  btn.title = on ? 'בטל מניעת נעילה' : 'מנע נעילת מסך';
+  btn.classList.toggle('is-on', on);
+  btn.title = on ? 'המסך יישאר דולק — לחץ לביטול' : 'השאר את המסך דולק';
+  btn.setAttribute('aria-label', btn.title);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
 }
 
 export async function releaseWakeLock() {

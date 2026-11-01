@@ -64,11 +64,11 @@ export function renderChapterDrawerList(currentIdx) {
     const outline = store.state.book?.chapterOutlines?.[i];
     btn.innerHTML = `
       <span class="drawer-chapter-num">${ch.number}</span>
-      <span style="flex:1">
-        <div style="font-weight:600">${escapeHtml(ch.title)}</div>
-        ${outline?.pov ? `<div style="font-size:0.72rem;opacity:0.55;margin-top:0.15rem">${escapeHtml(outline.pov)}</div>` : ''}
-      </span>
-      ${i === currentIdx ? '<span style="font-size:0.75rem;color:var(--gold)">●</span>' : ''}`;
+      <span class="drawer-chapter-text">
+        <span class="drawer-chapter-title">${escapeHtml(ch.title)}</span>
+        ${outline?.pov ? `<span class="drawer-chapter-pov">${escapeHtml(outline.pov)}</span>` : ''}
+      </span>`;
+    if (i === currentIdx) btn.setAttribute('aria-current', 'true');
     btn.onclick = () => {
       closeChapterDrawer();
       openChapter(i);
@@ -98,7 +98,7 @@ export function renderReadingNav(idx) {
 
   if (idx + 1 < written) {
     nextBtn.disabled = false;
-    nextBtn.textContent = 'פרק הבא ←';
+    nextBtn.textContent = 'הפרק הבא';
     nextBtn.onclick = () => openChapter(idx + 1);
   } else if (isLastOutline) {
     nextBtn.disabled = true;
@@ -110,7 +110,7 @@ export function renderReadingNav(idx) {
     nextBtn.onclick = null;
   } else {
     nextBtn.disabled = false;
-    nextBtn.textContent = 'המשך לקרוא ←';
+    nextBtn.textContent = 'כתוב את הפרק הבא';
     nextBtn.onclick = () => continueFromChapter(idx);
   }
 
@@ -170,7 +170,7 @@ export function showLiveChapter(idx) {
 
   document.getElementById('chapter-end-actions').innerHTML = `
     <div class="live-status" role="status">
-      <span class="live-quill" aria-hidden="true">✒</span>
+      <span class="live-quill dot-anim" aria-hidden="true"><span>•</span><span>•</span><span>•</span></span>
       <span class="live-status-text">הפרק נכתב עכשיו — אפשר כבר לקרוא</span>
     </div>`;
 
@@ -186,7 +186,7 @@ export function showLiveChapter(idx) {
     nextBtn.disabled = true;
     nextBtn.onclick = null;
     nextBtn.classList.add('live-progress');
-    nextBtn.textContent = '✒ נכתב...';
+    nextBtn.textContent = 'נכתב...';
   }
 
   showScreen('reading-screen');
@@ -202,7 +202,7 @@ export function updateLiveChapter(idx, text) {
   live.shown = common;
   live.target = text;
   const nextBtn = document.getElementById('nav-next-chapter');
-  if (nextBtn) nextBtn.textContent = `✒ נכתב · ${countWords(text).toLocaleString('he-IL')} מילים`;
+  if (nextBtn) nextBtn.textContent = `נכתב: ${countWords(text).toLocaleString('he-IL')} מילים`;
   if (!live.frame) live.frame = requestAnimationFrame(revealLiveText);
 }
 
@@ -381,13 +381,12 @@ export function openChapter(idx, { keepScroll = false, revisedPassages = [] } = 
   if (isLast) {
     const doneMsg = document.createElement('div');
     doneMsg.className = 'end-of-book';
-    doneMsg.textContent = isBookComplete() ? '✦ סוף הספר ✦' : '✦ סוף הפרק ✦';
+    doneMsg.textContent = isBookComplete() ? 'סוף הספר' : 'סוף הפרק';
     endEl.appendChild(doneMsg);
     if (isBookComplete()) {
       const row = document.createElement('div');
       row.className = 'complete-btn-row';
-      row.style.marginTop = '1rem';
-      [['📥 EPUB', () => exportBookEpub()], ['🌍 עוד סיפור באותו עולם', () => promptSequelBook()]]
+      [['הורד EPUB', () => exportBookEpub()], ['עוד סיפור באותו עולם', () => promptSequelBook()]]
         .forEach(([label, fn]) => {
           const b = document.createElement('button');
           b.type = 'button';
@@ -402,6 +401,7 @@ export function openChapter(idx, { keepScroll = false, revisedPassages = [] } = 
 
   const backBtn = document.createElement('button');
   backBtn.className = 'back-to-library-btn';
+  backBtn.type = 'button';
   backBtn.textContent = 'חזרה לתוכן העניינים';
   backBtn.onclick = showLibrary;
   endEl.appendChild(backBtn);
