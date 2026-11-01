@@ -40,20 +40,60 @@ export function idbRequestToPromise(req) {
   });
 }
 
-export async function idbReadApp() {
-  const db = await openAppDb();
-  const tx = db.transaction(cfg.IDB_STORE, 'readonly');
-  return idbRequestToPromise(tx.objectStore(cfg.IDB_STORE).get(cfg.STORAGE_KEY));
+// Each book lives in its own record ('book:<id>') next to a small settings record, so a
+// save only rewrites books whose object changed since the last write. That relies on
+// every change to store.app.books replacing the book object (bookSnapshot, import) —
+// never mutate a stored book in place.
+const persistedBooks = new Map(); // id -> book object as last written
+let legacyRecordPresent = false;  // pre-v3 single record still in the store
+
+function bookKeyRange() {
+  return IDBKeyRange.bound(cfg.IDB_BOOK_PREFIX, cfg.IDB_BOOK_PREFIX + '￿');
 }
 
-export async function idbWriteApp(data) {
+export async function idbReadApp() {
+  const db = await openAppDb();
+  const os = db.transaction(cfg.IDB_STORE, 'readonly').objectStore(cfg.IDB_STORE);
+  const [meta, keys, books, legacy] = await Promise.all([
+    idbRequestToPromise(os.get(cfg.IDB_META_KEY)),
+    idbRequestToPromise(os.getAllKeys(bookKeyRange())),
+    idbRequestToPromise(os.getAll(bookKeyRange())),
+    idbRequestToPromise(os.get(cfg.STORAGE_KEY))
+  ]);
+  legacyRecordPresent = !!legacy;
+  persistedBooks.clear();
+  if (!meta) return legacy || null; // old layout: written out split on the next save
+
+  const app = { ...meta, books: {} };
+  keys.forEach((key, i) => {
+    const id = String(key).slice(cfg.IDB_BOOK_PREFIX.length);
+    app.books[id] = books[i];
+    persistedBooks.set(id, books[i]);
+  });
+  return app;
+}
+
+export async function idbWriteApp(app) {
   const db = await openAppDb();
   const tx = db.transaction(cfg.IDB_STORE, 'readwrite');
-  tx.objectStore(cfg.IDB_STORE).put(data, cfg.STORAGE_KEY);
-  return new Promise((resolve, reject) => {
+  const os = tx.objectStore(cfg.IDB_STORE);
+  const { books = {}, ...meta } = app;
+
+  const changed = Object.entries(books).filter(([id, book]) => persistedBooks.get(id) !== book);
+  const removed = [...persistedBooks.keys()].filter(id => !(id in books));
+  changed.forEach(([id, book]) => os.put(book, cfg.IDB_BOOK_PREFIX + id));
+  removed.forEach(id => os.delete(cfg.IDB_BOOK_PREFIX + id));
+  os.put(meta, cfg.IDB_META_KEY);
+  if (legacyRecordPresent) os.delete(cfg.STORAGE_KEY);
+
+  await new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
   });
+  changed.forEach(([id, book]) => persistedBooks.set(id, book));
+  removed.forEach(id => persistedBooks.delete(id));
+  legacyRecordPresent = false;
 }
 
 export function syncAppFromState() {
@@ -200,6 +240,7 @@ export async function loadApp() {
     }
     if (loaded) applyLoadedAppData();
     else store.state = createEmptyBookState();
+    if (legacyRecordPresent) save({ immediate: true });
   } catch (e) {
     const preservedKey = store.app?.apiKey || store.state?.apiKey || '';
     ensureMinimalAppShell();

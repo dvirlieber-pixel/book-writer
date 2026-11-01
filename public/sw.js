@@ -1,6 +1,12 @@
-const CACHE_NAME = 'seferiyat-hanetzach-v14';
+// Both lines are rewritten by the sw-manifest plugin in vite.config.js at build time:
+// the version is a hash of the built files, the asset list is Vite's hashed JS/CSS.
+const BUILD_VERSION = 'dev';
+const BUILD_ASSETS = [];
+
+const CACHE_NAME = `seferiyat-hanetzach-${BUILD_VERSION}`;
 
 const PRECACHE_URLS = [
+  ...BUILD_ASSETS,
   './',
   './index.html',
   './manifest.webmanifest',
@@ -46,8 +52,11 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(request)
         .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
+          // Never replace the offline shell with an error page
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
+          }
           return response;
         })
         .catch(() => caches.match('./index.html'))

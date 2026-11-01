@@ -4,6 +4,9 @@ export const STORAGE_KEY = 'sanderson-library-v2';
 export const IDB_NAME = 'seferiyat-hanetzach';
 export const IDB_VERSION = 1;
 export const IDB_STORE = 'kv';
+/** IndexedDB layout v3: app settings in one record, each book in its own record */
+export const IDB_META_KEY = 'app-v3';
+export const IDB_BOOK_PREFIX = 'book:';
 export const GEMINI_FETCH_TIMEOUT_MS = 120000;
 /** מרווח מינימלי בין בקשות — שומר מתחת למכסת RPM החינמית */
 export const GEMINI_MIN_REQUEST_GAP_MS = 2800;

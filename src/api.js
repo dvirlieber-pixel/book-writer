@@ -112,8 +112,8 @@ export async function pumpGeminiRequestQueue() {
       const job = geminiRateLimiter.queue.shift();
       try {
         await waitForGeminiSlot();
+        recordGeminiRequest(); // count at send time, every attempt
         const result = await job.fn();
-        recordGeminiRequest();
         job.resolve(result);
       } catch (e) {
         job.reject(e);
@@ -186,15 +186,15 @@ export function refreshModelFallbackNotice() {
 }
 
 export async function callGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE, options = {}) {
-  const priority = resolveGeminiPriority(options);
-  return enqueueGeminiRequest(
-    () => executeGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model, options),
-    priority
-  );
+  return executeGeminiRawOnce(prompt, systemPrompt, maxTokens, retries, model, options);
 }
 
+// Each HTTP attempt goes through the rate-limit queue on its own, so retries are counted
+// against the per-minute budget and backoff waits never hold the queue for other calls.
 export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 8192, retries = 4, model = cfg.GEMINI_MODEL_PROSE, options = {}) {
   const delay = ms => new Promise(res => setTimeout(res, ms));
+  // Captured once: the priority stack may change while this call waits between attempts
+  const priority = resolveGeminiPriority(options);
   const generationConfig = {
     maxOutputTokens: maxTokens,
     temperature: options.jsonMode ? 0.7 : 0.9
@@ -206,23 +206,27 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), cfg.GEMINI_FETCH_TIMEOUT_MS);
+    let timeoutId;
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: (systemPrompt ? systemPrompt + '\n\n' : '') + prompt }] }],
-            generationConfig
-          })
-        }
-      );
+      const response = await enqueueGeminiRequest(() => {
+        // Timeout starts when the request is actually sent, not while it waits in the queue
+        timeoutId = setTimeout(() => controller.abort(), cfg.GEMINI_FETCH_TIMEOUT_MS);
+        return fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: (systemPrompt ? systemPrompt + '\n\n' : '') + prompt }] }],
+              generationConfig
+            })
+          }
+        );
+      }, priority);
       clearTimeout(timeoutId);
 
       if (response.status === 429) {
@@ -235,8 +239,8 @@ export async function executeGeminiRawOnce(prompt, systemPrompt, maxTokens = 819
           || cfg.GEMINI_RATE_LIMIT_PAUSE_MS * (attempt + 1)
         );
         if (attempt < retries) {
+          // The global pause makes waitForGeminiSlot hold the next attempt (and every other call)
           showGeminiRateLimitStatus(backoffMs);
-          await delay(backoffMs);
           continue;
         }
         throw quotaExceededError(msg || 'יותר מדי בקשות בדקה — נסה שוב בעוד דקה');

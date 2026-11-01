@@ -1,4 +1,3 @@
-import * as cfg from './constants.js';
 import { store } from './store.js';
 
 export function boot(App) {
@@ -42,11 +41,8 @@ export function boot(App) {
     }
   });
 
-  window.addEventListener('pagehide', () => {
-    App.syncAppFromState();
-    clearTimeout(store.saveTimer);
-    try { localStorage.setItem(cfg.STORAGE_KEY, JSON.stringify(store.app)); } catch (_) {}
-  });
+  // Flush any debounced save; flushSave falls back to localStorage only if IndexedDB fails
+  window.addEventListener('pagehide', () => App.save({ immediate: true }));
 
   window.addEventListener('online', () => App.updateOfflineBanner());
   window.addEventListener('offline', () => App.updateOfflineBanner());
