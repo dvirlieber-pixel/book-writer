@@ -4,12 +4,13 @@
  * Install: <script src="/dl-splash.js"></script> at the top of <head>. It carries its own styles and
  * draws the mark as vector paths, so it needs no fonts, no CSS and no framework, and it dismisses itself.
  * Optional: initDLSplash(cb) runs cb as the splash starts to fade, so the app's first screen is ready
- * underneath it. A tap skips ahead.
+ * underneath it. A tap skips ahead. Add data-once to the script tag to show it only on the first launch.
  *
  * The moment: the five dots gather into one, which falls into place as the period of D.L,
  * and the letters are drawn on either side of it.
  */
 (function (global) {
+  const SEEN_KEY = 'dl_splash_seen';
   const HOLD_MS = 1700;
   const HOLD_REDUCED_MS = 900;
   const FADE_MS = 350;
@@ -94,6 +95,17 @@
     setTimeout(() => splash.remove(), FADE_MS);
   }
 
+  function alreadySeen() {
+    if (!document.currentScript || !document.currentScript.hasAttribute('data-once')) return false;
+    try {
+      if (localStorage.getItem(SEEN_KEY) === '1') return true;
+      localStorage.setItem(SEEN_KEY, '1');
+    } catch (e) {
+      // storage unavailable — the splash just shows again next launch
+    }
+    return false;
+  }
+
   function mount() {
     const reduced = global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const style = document.createElement('style');
@@ -116,5 +128,6 @@
     else callbacks.push(onReady);
   };
 
-  mount();
+  if (alreadySeen()) started = true;
+  else mount();
 })(typeof window !== 'undefined' ? window : globalThis);
