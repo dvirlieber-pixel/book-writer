@@ -94,7 +94,10 @@ export const LOADING_STATUS_MESSAGES = [
   'מסדר את תוכן העניינים...'
 ];
 
-export const MIN_CHAPTER_WORDS = 900;
+/** Floor below which a chapter counts as cut off; a finished chapter above it is never extended */
+export const MIN_CHAPTER_WORDS = 600;
+/** Length asked for per planned scene (the model tends to write well under a chapter-wide target) */
+export const WORDS_PER_SCENE = 500;
 /** Thinking tokens allowed per prose call (they count toward maxOutputTokens) */
 export const PROSE_THINKING_BUDGET = 1024;
 /** Output budget for a whole chapter in one call (~2,000 Hebrew words is ~6k tokens) */

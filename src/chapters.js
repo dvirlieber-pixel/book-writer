@@ -261,6 +261,8 @@ export async function runGenerateChapterAt(idx, { background = false, openAfter 
     }
 
     setPreparingStatus('כמעט מוכן...', useLoadingScreen);
+    text = await repairForeignWords(text);
+    assertSameBook();
     const { memoryBook, summary } = await analyzeChapter(text, chapterNum, outline);
     assertSameBook();
 
@@ -500,11 +502,11 @@ export async function reviewChapter(text, idx, plan) {
   const outline = book.chapterOutlines[idx];
   const memoryContext = formatMemoryBookForPrompt();
 
+  const next = book.chapterOutlines[idx + 1];
   const prompt = `בדוק את הפרק מול התכנון וספר הזיכרון. החזר JSON בלבד:
 {
-  "approved": true/false,
   "score": 1-10,
-  "issues": [{"type": "דמות|מקום|עולם|תעלומה|עלילה|סגנון", "description": "בעיה", "severity": "גבוה|בינוני|נמוך"}]
+  "issues": [{"type": "דמות|מקום|עולם|תעלומה|עלילה|סגנון", "description": "בעיה", "severity": "גבוה|בינוני|נמוך", "quote": "ציטוט מדויק מהפרק"}]
 }
 
 **פרק ${outline.number}:** ${outline.title}
@@ -515,29 +517,41 @@ ${memoryContext}
 
 ${outline.purpose || outline.turn ? 'פרק שלא מממש את תפקידו או את השינוי המתוכנן — issue מסוג עלילה בחומרה בינוני.\n' : ''}דמות שמופיעה בלשון (זכר/נקבה) שונה מהמסומן בספר הזיכרון — issue מסוג דמות בחומרה בינוני.
 
-**הפרק המלא:**
+${next ? `**הפרק הבא:** ${next.title} — ${next.summary}\nאירועי הפרק הבא אינם חסרים מהפרק הזה.\n\n` : ''}**הפרק המלא:**
 ${chapterTextForAnalysis(text)}
 
-approved=false אם הפרק נקטע באמצע משפט, חסר סיום, או קצר מ-${cfg.MIN_CHAPTER_WORDS} מילים.
-approved=true רק אם אין בעיות severity גבוה, יש סיום מלא, והפרק תואם את התכנון וספר הזיכרון.`;
+כללי הבדיקה:
+- חומרה גבוהה רק לסתירה ממשית לספר הזיכרון או לתכנון, עם quote מדויק מהפרק שמוכיח אותה.
+- סיום במתח או ב-hook הוא הסיום הרצוי ואינו בעיה. אל תדרוש אירועים שמעבר לתכנון הפרק.
+- אל תעריך אורך ואל תבדוק אם הפרק נקטע — זה נבדק בנפרד.`;
 
   const { text: reviewRaw } = await callGeminiLiteRaw(prompt, '', 2000, { jsonMode: true });
-  const review = parseJsonFromResponse(reviewRaw) || { approved: true, score: 7, issues: [] };
-  if (!review.issues) review.issues = [];
+  return finalizeReview(parseJsonFromResponse(reviewRaw), text);
+}
+
+/**
+ * Turns the model's review into a decision made by code: a high-severity claim counts only
+ * if its quote really appears in the chapter (a model once "measured" 1,160 words as 700 and
+ * forced a rewrite), length and ending are checked directly, and approval follows from that.
+ */
+export function finalizeReview(parsed, text) {
+  const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const body = norm(text);
+  const issues = (Array.isArray(parsed?.issues) ? parsed.issues : [])
+    .filter(i => i && typeof i === 'object')
+    .map(i => {
+      if (i.severity !== 'גבוה') return i;
+      const quote = norm(i.quote);
+      return quote.length >= 8 && body.includes(quote) ? i : { ...i, severity: 'בינוני' };
+    });
 
   if (!endsWithCompleteSentence(text)) {
-    review.issues.push({ type: 'עלילה', description: 'הפרק נקטע באמצע — חסר סיום במשפט שלם', severity: 'גבוה' });
+    issues.push({ type: 'עלילה', description: 'הפרק נקטע באמצע — חסר סיום במשפט שלם', severity: 'גבוה' });
   }
   if (countWords(text) < cfg.MIN_CHAPTER_WORDS) {
-    review.issues.push({ type: 'עלילה', description: `הפרק קצר מדי (${countWords(text)} מילים)`, severity: 'גבוה' });
+    issues.push({ type: 'עלילה', description: `הפרק קצר מדי (${countWords(text)} מילים)`, severity: 'גבוה' });
   }
-
-  if (review.approved === undefined) {
-    review.approved = !review.issues.some(i => i.severity === 'גבוה');
-  } else if (review.issues.some(i => i.severity === 'גבוה')) {
-    review.approved = false;
-  }
-  return review;
+  return { score: parsed?.score, issues, approved: !issues.some(i => i.severity === 'גבוה') };
 }
 
 export async function fixChapter(text, review, idx, plan) {
@@ -545,11 +559,8 @@ export async function fixChapter(text, review, idx, plan) {
   const outline = book.chapterOutlines[idx];
   const baselineWords = countWords(text);
   const issues = review.issues || [];
-  const hasTruncationIssue = issues.some(i =>
-    i.severity === 'גבוה' && /נקטע|קצר מדי|סיום|חתוך/i.test(i.description || '')
-  );
 
-  if (hasTruncationIssue) {
+  if (!isChapterTextValid(text)) {
     const ctx = buildChapterContext(idx, plan);
     const extended = await finalizeChapterEnding(text, idx, plan, ctx);
     if (isChapterTextValid(extended) && countWords(extended) >= baselineWords * 0.85) {
@@ -569,7 +580,7 @@ export async function fixChapter(text, review, idx, plan) {
   const prompt = `תקן את הפרק הבא לפי הבעיות שזוהו. שמור על אורך מלא (לפחות ${cfg.MIN_CHAPTER_WORDS} מילים) ומעברי [***].
 ${style}
 אם הפרק נקטע — השלם אותו עד סיום מלא עם hook. סיים תמיד במשפט שלם.
-אל תשנה אירועים שלא קשורים לתיקון. החזר את הפרק המלא בלבד — ללא כותרת, ללא הסברים.
+אל תשנה אירועים שלא קשורים לתיקון, ואל תוסיף אירועים שמעבר לסיום המתוכנן של הפרק${outline.hook ? ` (${outline.hook})` : ''}. החזר את הפרק המלא בלבד — ללא כותרת, ללא הסברים.
 
 **בעיות לתיקון:**
 ${issuesList || 'שיפור עקביות כללי'}
@@ -667,6 +678,66 @@ ${text}`;
   return edited;
 }
 
+// ===== FOREIGN-SCRIPT REPAIR =====
+const FOREIGN_SCRIPT = /[A-Za-zЀ-ӿ؀-ۿ一-鿿]/;
+
+/** Words containing non-Hebrew letters (the model sometimes leaks "ברعب" or "felt" into prose) */
+export function findForeignWords(text) {
+  const words = text.split(/\s+/).filter(w => FOREIGN_SCRIPT.test(w));
+  return [...new Set(words.map(w => w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '')))];
+}
+
+/**
+ * Applies small find/replace corrections as whole words/phrases. Anything that looks like a
+ * rewrite rather than a correction is skipped, so a bad reply can't damage the chapter.
+ */
+export function applyProofreading(text, replacements) {
+  let out = text;
+  let applied = 0;
+  for (const r of (Array.isArray(replacements) ? replacements : []).slice(0, 60)) {
+    const find = typeof r?.find === 'string' ? r.find.trim() : '';
+    const replace = typeof r?.replace === 'string' ? r.replace.trim() : '';
+    if (!find || !replace || find === replace) continue;
+    if (find.length > 80 || replace.length > find.length + 30) continue;
+    if (/[\n[\]*]/.test(find + replace) || FOREIGN_SCRIPT.test(replace)) continue;
+    const escaped = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+    const re = new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'gu');
+    const next = out.replace(re, () => replace);
+    if (next !== out) applied++;
+    out = next;
+  }
+  return { text: out, applied };
+}
+
+/**
+ * Replaces words with non-Hebrew letters; no call when there are none. Deliberately narrow:
+ * given free rein on real chapters, the Lite model "corrected" sound Hebrew and even broke
+ * gender agreement ("שוליה צעיר" -> "שוליה צעירה"), so only these detectable errors are touched.
+ */
+export async function repairForeignWords(text) {
+  const foreign = findForeignWords(text);
+  if (!foreign.length) return text;
+
+  const contexts = foreign.map(word => {
+    const at = text.indexOf(word);
+    return `- "${word}" בתוך: "${text.slice(Math.max(0, at - 80), at + word.length + 80).replace(/\s+/g, ' ')}"`;
+  }).join('\n');
+  const prompt = `בטקסט ספרותי בעברית השתרבבו מילים עם אותיות זרות. לכל מילה, כתוב את המילה העברית שמתאימה להקשר.
+החזר JSON בלבד: {"replacements": [{"find": "המילה כפי שהיא", "replace": "המילה בעברית"}]}
+
+${contexts}`;
+
+  try {
+    const { text: raw } = await callGeminiLiteRaw(prompt, '', 1000, { jsonMode: true });
+    const replies = parseJsonFromResponse(raw)?.replacements;
+    const allowed = (Array.isArray(replies) ? replies : []).filter(r => foreign.includes(r?.find));
+    return applyProofreading(text, allowed).text;
+  } catch (e) {
+    console.warn('repairForeignWords failed:', e);
+    return text;
+  }
+}
+
 /** Chapter text for analysis prompts: whole chapter, or start + end when very long */
 export function chapterTextForAnalysis(chapterText, maxChars = 14000) {
   if (chapterText.length <= maxChars) return chapterText;
@@ -754,6 +825,7 @@ export async function analyzeChapter(chapterText, chapterNum, outline) {
    - רשומה חדשה: כל השדות.
    - רשומה קיימת שהשתנתה: אותו מפתח בדיוק כמו בספר הזיכרון (name / rule / question) ורק השדות שהשתנו.
    - תעלומה שנפתרה: אותה question עם "status": "נפתר".
+   - כל דמות, מקום, כלי תחבורה או חפץ שקיבלו שם או תפקיד בפרק ואינם בספר הזיכרון — חובה להוסיף, גם אם הם משניים.
    - רשומה שלא השתנתה — אל תכלול. אין צורך למחוק דבר.
 
 ספר זיכרון נוכחי:
@@ -823,7 +895,7 @@ export function chapterContinuationContext(outline, plan) {
     `**הפרק:** ${outline.number} — ${outline.title}: ${outline.summary}`,
     scenes.length ? `**הסצנות המתוכננות:**\n${scenes.join('\n')}` : '',
     outline.turn ? `**מה משתנה עד סוף הפרק:** ${outline.turn}` : '',
-    outline.hook ? `**הסיום המתוכנן (hook):** ${outline.hook}` : ''
+    outline.hook ? `**הסיום המתוכנן (hook):** ${outline.hook} (אל תעתיק את הניסוח)` : ''
   ].filter(Boolean).join('\n');
 }
 
@@ -867,7 +939,7 @@ export async function extendProse(text, instruction, minWords, maxRounds = cfg.P
 }
 
 export async function finalizeChapterEnding(fullText, idx, plan, ctx) {
-  if (isChapterTextValid(fullText) && countWords(fullText) >= 1100) return fullText;
+  if (isChapterTextValid(fullText)) return fullText;
 
   const { outline } = ctx;
   let merged = await extendProse(
@@ -926,11 +998,12 @@ ${eventLogContext ? eventLogContext + '\n\n' : ''}${lastChapterSnippet ? lastCha
 ${sceneLines}
 
 **הנחיות:**
-- פרק שלם ורציף של 1,500-2,200 מילים שמכסה את כל הסצנות לפי הסדר.
+- פרק שלם ורציף באורך של לפחות ${scenes.length * cfg.WORDS_PER_SCENE} מילים, שמכסה את כל הסצנות לפי הסדר.
+- כל סצנה לפחות ${cfg.WORDS_PER_SCENE} מילים: פתח אותה כהתרחשות חיה עם דיאלוג, פעולה ותחושות, ואל תסכם אירועים במשפט.
 - ${idx === 0 ? 'פתח באמצע פעולה — בלי הקדמת רקע ארוכה.' : 'המשך באופן טבעי מהרגע שבו נגמר הפרק הקודם.'}
 - מעבר בין סצנות: שורה נפרדת עם [***] רק כשיש קפיצה בזמן או במקום; אחרת מעבר רציף בפרוזה.
-- סיים את הפרק ב-hook חזק במשפט סגור${outline.hook ? `. ה-hook המתוכנן: ${outline.hook}` : ''}.
-- פרוזה בלבד, ללא כותרות.`;
+- סיים את הפרק ב-hook חזק במשפט סגור${outline.hook ? `. מה קורה ב-hook: ${outline.hook} — כתוב זאת כרגע חי בלשונך, אל תעתיק את הניסוח הזה` : ''}.
+- פרוזה בלבד, ללא כותרות, ובאותיות עבריות בלבד — בלי מילים באנגלית, בערבית או בכתב אחר.`;
 
   if (onSceneProgress) onSceneProgress(0, 1);
   const { text, finishReason } = await callGeminiRaw(

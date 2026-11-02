@@ -112,6 +112,8 @@ try {
         review = await App.reviewChapter(text, idx, plan);
         reviews.push(review);
       }
+      stage = `ch${num} repair`;
+      text = await App.repairForeignWords(text);
       stage = `ch${num} analysis`;
       const { memoryBook, summary } = await App.analyzeChapter(text, num, outline);
       store.state.chapters.push({ title: App.sanitizeChapterTitle(outline.title, num), text, number: num, reviews });
