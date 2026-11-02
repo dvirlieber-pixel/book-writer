@@ -18,7 +18,7 @@ const PRECACHE_URLS = [
   './icons/apple-touch-icon.png',
   './icons/screenshot-wide.png',
   './icons/screenshot-narrow.png',
-  'https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@300;400;600;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap'
+  'https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700;900&family=IBM+Plex+Sans+Hebrew:wght@400;500;600&display=swap'
 ];
 
 self.addEventListener('install', event => {
