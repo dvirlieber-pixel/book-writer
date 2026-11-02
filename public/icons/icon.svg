@@ -1,27 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="áäèÙÙê Ôàæ×">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="×¡×¤×¨×™×™×ª ×”××™× ×¡×•×£">
   <defs>
-    <radialGradient id="glow" cx="50%" cy="28%" r="45%">
-      <stop offset="0%" stop-color="#e8c96a" stop-opacity="0.55"/>
-      <stop offset="100%" stop-color="#1a1410" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#e8c96a"/>
-      <stop offset="100%" stop-color="#8a6f2e"/>
+    <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe29a"/>
+      <stop offset="0.55" stop-color="#f0b64e"/>
+      <stop offset="1" stop-color="#d98a2b"/>
     </linearGradient>
-    <linearGradient id="page" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#faf6ee"/>
-      <stop offset="100%" stop-color="#e8dcc4"/>
+    <linearGradient id="core" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff3cf"/>
+      <stop offset="1" stop-color="#ffdf94"/>
+    </linearGradient>
+    <linearGradient id="pageL" x1="0" y1="0" x2="1" y2="0.25">
+      <stop offset="0" stop-color="#e9dcbd"/>
+      <stop offset="1" stop-color="#fbf4e2"/>
+    </linearGradient>
+    <linearGradient id="pageR" x1="1" y1="0" x2="0" y2="0.25">
+      <stop offset="0" stop-color="#dccdaa"/>
+      <stop offset="1" stop-color="#f1e7cf"/>
+    </linearGradient>
+    <linearGradient id="cover" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9b265"/>
+      <stop offset="1" stop-color="#a27c36"/>
+    </linearGradient>
+    <radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="256" cy="176" r="190">
+      <stop offset="0" stop-color="#f0b64e" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#f0b64e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f352c"/>
+      <stop offset="1" stop-color="#13201b"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="108" fill="#1a1410"/>
-  <circle cx="256" cy="150" r="120" fill="url(#glow)"/>
-  <path d="M256 88c-6 0-11 4-12 10l-8 44c-1 6-6 10-12 10s-11-4-12-10l-8-44c-1-6-6-10-12-10-8 0-14 7-12 15l18 78c2 8 9 14 18 14h36c9 0 16-6 18-14l18-78c2-8-4-15-12-15z" fill="url(#gold)"/>
-  <ellipse cx="256" cy="98" rx="14" ry="18" fill="#f5d87a" opacity="0.9"/>
-  <path d="M148 200h216c12 0 22 10 22 22v196c0 12-10 22-22 22H148c-12 0-22-10-22-22V222c0-12 10-22 22-22z" fill="#2a2218" stroke="url(#gold)" stroke-width="6"/>
-  <path d="M256 200v240" stroke="#8a6f2e" stroke-width="4" opacity="0.6"/>
-  <path d="M168 248h76M168 296h88M168 344h64" stroke="#c9a84c" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
-  <path d="M268 248h76M244 296h88M276 344h64" stroke="#c9a84c" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
-  <path d="M178 210c0-8 35-18 78-18s78 10 78 18v8H178v-8z" fill="url(#page)"/>
-  <path d="M256 210c43 0 78 10 78 18v8H256v-26z" fill="#f0e6d2"/>
-  <circle cx="256" cy="418" r="6" fill="url(#gold)" opacity="0.8"/>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#glow)"/>
+  <g transform="translate(0 16) scale(1)">
+  <path d="M259 58C263 100 300 132 300 178C300 214 280 236 256 236C232 236 212 214 212 178C212 148 231 126 242 103C249 89 256 76 259 58Z" fill="url(#flame)"/>
+  <path d="M258 132C261 152 276 166 276 190C276 210 267 223 256 223C245 223 236 210 236 190C236 168 252 154 258 132Z" fill="url(#core)"/>
+  <path d="M256 304C223.8 270 163.6 258 94.8 272L79.7 388C146.4 376 219.4 386 256 424Z" fill="url(#cover)"/>
+  <g transform="matrix(-1 0 0 1 512 0)"><path d="M256 304C223.8 270 163.6 258 94.8 272L79.7 388C146.4 376 219.4 386 256 424Z" fill="url(#cover)"/></g>
+  <path d="M256 295C224.5 261 165.7 249 98.5 263L83.8 379C148.9 367 220.3 377 256 415Z" fill="#b9a67d"/>
+  <g transform="matrix(-1 0 0 1 512 0)"><path d="M256 295C224.5 261 165.7 249 98.5 263L83.8 379C148.9 367 220.3 377 256 415Z" fill="#a8966e"/></g>
+  <path d="M256 288C225.3 254 167.9 242 102.3 256L87.9 372C151.4 360 221.2 370 256 408Z" fill="#d6c7a3"/>
+  <g transform="matrix(-1 0 0 1 512 0)"><path d="M256 288C225.3 254 167.9 242 102.3 256L87.9 372C151.4 360 221.2 370 256 408Z" fill="#c6b690"/></g>
+  <path d="M256 280C226 246 170 234 106 248L92 364C154 352 222 362 256 400Z" fill="url(#pageL)"/>
+  <g transform="matrix(-1 0 0 1 512 0)"><path d="M256 280C226 246 170 234 106 248L92 364C154 352 222 362 256 400Z" fill="url(#pageR)"/></g>
+  </g>
 </svg>

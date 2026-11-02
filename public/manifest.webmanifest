@@ -9,8 +9,8 @@
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "browser"],
-  "background_color": "#1a1410",
-  "theme_color": "#1a1410",
+  "background_color": "#13201b",
+  "theme_color": "#13201b",
   "categories": ["books", "entertainment"],
   "icons": [
     {
@@ -32,7 +32,7 @@
       "purpose": "any"
     },
     {
-      "src": "./icons/icon-512.png",
+      "src": "./icons/icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

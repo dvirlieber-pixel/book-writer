@@ -366,12 +366,11 @@ button:disabled { cursor: not-allowed; }
 .logo-area { text-align: center; }
 
 .logo-symbol {
-  width: 3.5rem;
-  height: 3.5rem;
+  display: block;
+  width: 4.5rem;
+  height: 4.5rem;
   margin: 0 auto var(--s-4);
-  color: var(--accent);
 }
-.logo-symbol svg { width: 100%; height: 100%; }
 
 .logo-title {
   font-family: var(--font-read);
